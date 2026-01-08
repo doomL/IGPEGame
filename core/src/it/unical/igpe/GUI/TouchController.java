@@ -58,11 +58,15 @@ public class TouchController {
     private BitmapFont font;
 
     // Visual parameters - made much larger for better visibility and touch
-    private static final float JOYSTICK_RADIUS = 120f;
-    private static final float JOYSTICK_KNOB_RADIUS = 60f;
+    private static final float JOYSTICK_RADIUS = 150f; // Bigger movement joystick
+    private static final float JOYSTICK_KNOB_RADIUS = 75f;
+    private static final float AIM_JOYSTICK_RADIUS = 150f; // Bigger aim joystick
+    private static final float AIM_JOYSTICK_KNOB_RADIUS = 75f;
     private static final float BUTTON_SIZE = 100f;
     private static final float LARGE_BUTTON_SIZE = 120f;
     private static final float PADDING = 50f; // More padding from screen edges
+    private static final float MARGIN_LEFT = 80f; // Left margin for movement joystick
+    private static final float MARGIN_BOTTOM = 80f; // Bottom margin for movement joystick
 
     public TouchController(OrthographicCamera camera) {
         this.camera = camera;
@@ -72,52 +76,10 @@ public class TouchController {
         this.shapeRenderer = new ShapeRenderer();
         this.font = new BitmapFont();
 
-        // Initialize movement joystick (bottom left, with more padding from edge)
-        joystickCenter = new Vector2(JOYSTICK_RADIUS + PADDING, JOYSTICK_RADIUS + PADDING);
-        joystickBounds = new Circle(joystickCenter.x, joystickCenter.y, JOYSTICK_RADIUS);
-        joystickKnobPosition = new Vector2(joystickCenter);
-        joystickKnobBounds = new Circle(joystickKnobPosition.x, joystickKnobPosition.y, JOYSTICK_KNOB_RADIUS);
-
-        // Initialize buttons (right side, with proper spacing)
+        // Initialize buttons (top of screen, with proper spacing)
         float screenWidth = Gdx.graphics.getWidth();
         float screenHeight = Gdx.graphics.getHeight();
         
-        // Initialize aiming joystick (right side, upper portion to avoid button overlap)
-        // Position at 2/3 of screen height to leave room for buttons below
-        aimJoystickCenter = new Vector2(screenWidth - JOYSTICK_RADIUS - PADDING, screenHeight * 0.7f);
-        aimJoystickBounds = new Circle(aimJoystickCenter.x, aimJoystickCenter.y, JOYSTICK_RADIUS);
-        aimJoystickKnobPosition = new Vector2(aimJoystickCenter);
-        aimJoystickKnobBounds = new Circle(aimJoystickKnobPosition.x, aimJoystickKnobPosition.y, JOYSTICK_KNOB_RADIUS);
-
-        // Shoot button (large, bottom right, but avoid aiming joystick area)
-        // Position it below the aiming joystick with more spacing
-        float shootButtonY = aimJoystickCenter.y - aimJoystickBounds.radius - LARGE_BUTTON_SIZE - 50f;
-        if (shootButtonY < PADDING) {
-            shootButtonY = PADDING; // Fallback to bottom if not enough space
-        }
-        shootButton = new Rectangle(
-            screenWidth - LARGE_BUTTON_SIZE - PADDING,
-            shootButtonY,
-            LARGE_BUTTON_SIZE,
-            LARGE_BUTTON_SIZE
-        );
-
-        // Reload button (above shoot button, with spacing)
-        reloadButton = new Rectangle(
-            screenWidth - BUTTON_SIZE - PADDING,
-            shootButton.y + shootButton.height + 20f,
-            BUTTON_SIZE,
-            BUTTON_SIZE
-        );
-
-        // Slow motion button (to the left of shoot, same row)
-        slowMotionButton = new Rectangle(
-            shootButton.x - BUTTON_SIZE - 20f,
-            shootButton.y,
-            BUTTON_SIZE,
-            BUTTON_SIZE
-        );
-
         // Pause button (top right corner, with padding)
         pauseButton = new Rectangle(
             screenWidth - BUTTON_SIZE - PADDING,
@@ -150,6 +112,46 @@ public class TouchController {
             BUTTON_SIZE,
             BUTTON_SIZE
         );
+        
+        // Reload button (below weapon buttons, right side)
+        reloadButton = new Rectangle(
+            screenWidth - BUTTON_SIZE - PADDING,
+            screenHeight - BUTTON_SIZE - PADDING - BUTTON_SIZE - 20f,
+            BUTTON_SIZE,
+            BUTTON_SIZE
+        );
+        
+        // Shoot button (large, below reload button, right side)
+        shootButton = new Rectangle(
+            screenWidth - LARGE_BUTTON_SIZE - PADDING,
+            reloadButton.y - LARGE_BUTTON_SIZE - 20f,
+            LARGE_BUTTON_SIZE,
+            LARGE_BUTTON_SIZE
+        );
+
+        // Slow motion button (to the left of shoot, same row)
+        slowMotionButton = new Rectangle(
+            shootButton.x - BUTTON_SIZE - 20f,
+            shootButton.y,
+            BUTTON_SIZE,
+            BUTTON_SIZE
+        );
+        
+        // Initialize movement joystick (bottom left, with margins)
+        joystickCenter = new Vector2(JOYSTICK_RADIUS + MARGIN_LEFT, JOYSTICK_RADIUS + MARGIN_BOTTOM);
+        joystickBounds = new Circle(joystickCenter.x, joystickCenter.y, JOYSTICK_RADIUS);
+        joystickKnobPosition = new Vector2(joystickCenter);
+        joystickKnobBounds = new Circle(joystickKnobPosition.x, joystickKnobPosition.y, JOYSTICK_KNOB_RADIUS);
+        
+        // Initialize aiming joystick (bottom right, with margins to avoid buttons)
+        // Position it at the bottom right, ensuring it doesn't overlap with buttons above
+        float aimJoystickBottom = AIM_JOYSTICK_RADIUS + MARGIN_BOTTOM;
+        float aimJoystickRight = screenWidth - AIM_JOYSTICK_RADIUS - MARGIN_LEFT;
+        aimJoystickCenter = new Vector2(aimJoystickRight, aimJoystickBottom);
+        aimJoystickBounds = new Circle(aimJoystickCenter.x, aimJoystickCenter.y, AIM_JOYSTICK_RADIUS);
+        aimJoystickKnobPosition = new Vector2(aimJoystickCenter);
+        aimJoystickKnobBounds = new Circle(aimJoystickKnobPosition.x, aimJoystickKnobPosition.y, AIM_JOYSTICK_KNOB_RADIUS);
+
     }
     
     private void updateUICamera() {
@@ -162,10 +164,32 @@ public class TouchController {
         if (uiCamera.viewportWidth != Gdx.graphics.getWidth() || 
             uiCamera.viewportHeight != Gdx.graphics.getHeight()) {
             updateUICamera();
-            // Update aiming joystick position if screen size changed
+            // Update positions if screen size changed
             float screenWidth = Gdx.graphics.getWidth();
             float screenHeight = Gdx.graphics.getHeight();
-            aimJoystickCenter.set(screenWidth - JOYSTICK_RADIUS - PADDING, screenHeight * 0.7f);
+            
+            // Update movement joystick position
+            joystickCenter.set(JOYSTICK_RADIUS + MARGIN_LEFT, JOYSTICK_RADIUS + MARGIN_BOTTOM);
+            joystickBounds.setPosition(joystickCenter.x, joystickCenter.y);
+            if (!joystickActive) {
+                joystickKnobPosition.set(joystickCenter);
+            }
+            
+            // Update button positions
+            pauseButton.setPosition(screenWidth - BUTTON_SIZE - PADDING, screenHeight - BUTTON_SIZE - PADDING);
+            float weaponButtonSpacing = BUTTON_SIZE + 20f;
+            float weaponButtonsStartX = screenWidth / 2 - (weaponButtonSpacing * 1.5f);
+            pistolButton.setPosition(weaponButtonsStartX, screenHeight - BUTTON_SIZE - PADDING);
+            shotgunButton.setPosition(weaponButtonsStartX + weaponButtonSpacing, screenHeight - BUTTON_SIZE - PADDING);
+            rifleButton.setPosition(weaponButtonsStartX + weaponButtonSpacing * 2, screenHeight - BUTTON_SIZE - PADDING);
+            reloadButton.setPosition(screenWidth - BUTTON_SIZE - PADDING, screenHeight - BUTTON_SIZE - PADDING - BUTTON_SIZE - 20f);
+            shootButton.setPosition(screenWidth - LARGE_BUTTON_SIZE - PADDING, reloadButton.y - LARGE_BUTTON_SIZE - 20f);
+            slowMotionButton.setPosition(shootButton.x - BUTTON_SIZE - 20f, shootButton.y);
+            
+            // Update aiming joystick position (bottom right)
+            float aimJoystickBottom = AIM_JOYSTICK_RADIUS + MARGIN_BOTTOM;
+            float aimJoystickRight = screenWidth - AIM_JOYSTICK_RADIUS - MARGIN_LEFT;
+            aimJoystickCenter.set(aimJoystickRight, aimJoystickBottom);
             aimJoystickBounds.setPosition(aimJoystickCenter.x, aimJoystickCenter.y);
             if (!aimJoystickActive) {
                 aimJoystickKnobPosition.set(aimJoystickCenter);
@@ -302,8 +326,8 @@ public class TouchController {
         Vector2 direction = new Vector2(touch).sub(aimJoystickCenter);
         float distance = direction.len();
 
-        if (distance > JOYSTICK_RADIUS - JOYSTICK_KNOB_RADIUS) {
-            direction.setLength(JOYSTICK_RADIUS - JOYSTICK_KNOB_RADIUS);
+        if (distance > AIM_JOYSTICK_RADIUS - AIM_JOYSTICK_KNOB_RADIUS) {
+            direction.setLength(AIM_JOYSTICK_RADIUS - AIM_JOYSTICK_KNOB_RADIUS);
         }
 
         aimJoystickKnobPosition.set(aimJoystickCenter).add(direction);
@@ -322,6 +346,8 @@ public class TouchController {
 
         // Invert Y direction to match screen coordinates
         direction.y = -direction.y;
+        // Rotate -90 degrees to fix the 90° offset (same as desktop mouse aiming)
+        direction.rotate90(-1);
         return direction.nor();
     }
     
@@ -364,9 +390,9 @@ public class TouchController {
         }
         shapeRenderer.circle(joystickKnobPosition.x, joystickKnobPosition.y, JOYSTICK_KNOB_RADIUS);
         
-        // Render aiming joystick base (right side, middle) - screen coordinates
+        // Render aiming joystick base (bottom right) - screen coordinates
         shapeRenderer.setColor(0.3f, 0.5f, 0.3f, 0.7f);
-        shapeRenderer.circle(aimJoystickCenter.x, aimJoystickCenter.y, JOYSTICK_RADIUS);
+        shapeRenderer.circle(aimJoystickCenter.x, aimJoystickCenter.y, AIM_JOYSTICK_RADIUS);
         
         // Render aiming joystick knob
         if (aimJoystickActive) {
@@ -374,7 +400,7 @@ public class TouchController {
         } else {
             shapeRenderer.setColor(0.4f, 0.6f, 0.4f, 0.7f);
         }
-        shapeRenderer.circle(aimJoystickKnobPosition.x, aimJoystickKnobPosition.y, JOYSTICK_KNOB_RADIUS);
+        shapeRenderer.circle(aimJoystickKnobPosition.x, aimJoystickKnobPosition.y, AIM_JOYSTICK_KNOB_RADIUS);
         
         // Render buttons (right side) - screen coordinates
         // Shoot button (large, bottom right)
