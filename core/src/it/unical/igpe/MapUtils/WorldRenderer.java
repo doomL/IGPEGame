@@ -27,6 +27,7 @@ public class WorldRenderer {
 	public OrthographicCamera camera;
 	public Viewport viewport;
 	private SpriteBatch batch;
+	public SpriteBatch getBatch() { return batch; }
 	private ShapeRenderer sr;
 	private float stateTime;
 

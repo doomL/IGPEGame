@@ -129,14 +129,16 @@ Environmental hazards that damage players who trigger them.
 
 ## Controls
 
-### Movement
+### Desktop Controls (PC/Mac/Linux)
+
+#### Movement
 - **W** - Move Up
 - **A** - Move Left
 - **S** - Move Down
 - **D** - Move Right
 - **W+A/W+D/S+A/S+D** - Diagonal movement
 
-### Combat
+#### Combat
 - **Mouse Aim** - Aim your weapon
 - **Left Click** - Shoot
 - **R** - Reload (manual) or Auto-reload when empty
@@ -144,12 +146,48 @@ Environmental hazards that damage players who trigger them.
 - **2** - Switch to Shotgun
 - **3** - Switch to Rifle
 
-### Special Actions
+#### Special Actions
 - **SPACEBAR** - Toggle Slow-Motion mode
 - **ESC** - Pause game / Open menu
 
-### Menu Navigation
+#### Menu Navigation
 - **Mouse** - Navigate menus and select options
+
+### Android Touch Controls
+
+#### Movement
+- **Virtual Joystick** (Bottom Left) - Drag to move your character in any direction
+  - Supports 360-degree movement
+  - Returns to center when released
+
+#### Combat
+- **Shoot Button** (Bottom Right, Large) - Tap and hold to fire your weapon continuously
+- **Aim** - Touch anywhere on screen to aim your weapon at that location
+- **Reload Button** (Right Side) - Tap to manually reload your weapon
+  - Auto-reload when clip is empty
+
+#### Weapon Selection (Top Center)
+- **Pistol Button** - Switch to Pistol
+- **Shotgun Button** - Switch to Shotgun
+- **Rifle Button** - Switch to Rifle
+
+#### Special Actions
+- **Slow-Motion Button** (Right Side) - Toggle slow-motion mode
+- **Pause Button** (Top Right Corner) - Pause game and open menu
+
+#### Touch Layout
+```
+[Pause]                    [1][2][3]
+                           Weapons
+
+                           [Reload]
+
+                           [SlowMo]
+
+[Joystick]                 [SHOOT]
+```
+
+**Note**: Android version supports multi-touch for simultaneous movement, aiming, and shooting.
 
 ## Maps
 
@@ -185,22 +223,41 @@ You can create and load custom maps using the level editor:
 
 ## Requirements
 
-### System Requirements
+### Desktop System Requirements
 - **OS**: Windows, Linux, or macOS
 - **Java**: JDK 8 or higher
 - **RAM**: 512 MB minimum
 - **Storage**: 100 MB available space
 - **Graphics**: OpenGL 2.0+ compatible
 
+### Android System Requirements
+- **Android Version**: 4.0 (Ice Cream Sandwich) or higher (API Level 14+)
+- **RAM**: 512 MB minimum
+- **Storage**: 100 MB available space
+- **Screen**: 5 inches or larger recommended
+- **Permissions**: Internet access (for multiplayer)
+
+**Note**: Android support is currently in development. See [ANDROID_SETUP.md](ANDROID_SETUP.md) for current status and instructions to complete the Android port.
+
 ### Development Requirements
 - **Gradle**: 8.14 (included via wrapper)
 - **Java**: JDK 8 or higher
 - **LibGDX**: 1.9.6
+- **Android SDK**: API Level 34 (for Android builds)
+- **Android Build Tools**: 8.1.0 (for Android builds)
 
 ## Building from Source
 
 ### Prerequisites
-Ensure you have Java JDK 8+ installed on your system.
+
+#### For Desktop Builds
+- Java JDK 8+ installed on your system
+
+#### For Android Builds
+- Java JDK 8+ installed
+- Android SDK installed (can be installed via Android Studio)
+- ANDROID_HOME environment variable set to your Android SDK location
+- Accept Android SDK licenses: `sdkmanager --licenses`
 
 ### Build Steps
 
@@ -224,36 +281,91 @@ Ensure you have Java JDK 8+ installed on your system.
    gradlew.bat build
    ```
 
-4. **Create distribution JAR**
-   ```bash
-   # Linux/macOS
-   ./gradlew dist
+### Building for Desktop
 
-   # Windows
-   gradlew.bat dist
-   ```
+**Create distribution JAR:**
+```bash
+# Linux/macOS
+./gradlew dist
+
+# Windows
+gradlew.bat dist
+```
 
 The standalone JAR will be created at:
 ```
 desktop/build/libs/desktop-1.0.jar
 ```
 
-### Build Tasks
+### Building for Android
+
+**⚠️ Android Build Status**: The Android module is set up but requires code refactoring to remove desktop-specific dependencies. See [ANDROID_SETUP.md](ANDROID_SETUP.md) for details and fix instructions.
+
+**Build Debug APK** (after applying fixes from ANDROID_SETUP.md):
+```bash
+# Linux/macOS
+./gradlew android:assembleDebug
+
+# Windows
+gradlew.bat android:assembleDebug
+```
+
+The debug APK will be created at:
+```
+android/build/outputs/apk/debug/android-debug.apk
+```
+
+**Build Release APK:**
+```bash
+# Linux/macOS
+./gradlew android:assembleRelease
+
+# Windows
+gradlew.bat android:assembleRelease
+```
+
+The release APK will be created at:
+```
+android/build/outputs/apk/release/android-release.apk
+```
+
+**Note**: For release builds, you'll need to sign the APK with your keystore. Configure signing in `android/build.gradle`.
+
+### Install APK to Connected Device
+
+```bash
+# Install debug version
+./gradlew android:installDebug
+
+# Install and run
+./gradlew android:installDebug android:run
+```
+
+### Gradle Tasks Summary
+
+#### Desktop Tasks
 - `./gradlew build` - Compile and build all modules
 - `./gradlew dist` - Create standalone distribution JAR
 - `./gradlew clean` - Clean build artifacts
 - `./gradlew desktop:run` - Run the game directly
 - `./gradlew desktop:debug` - Run in debug mode
 
+#### Android Tasks
+- `./gradlew android:assembleDebug` - Build debug APK
+- `./gradlew android:assembleRelease` - Build release APK
+- `./gradlew android:installDebug` - Install debug APK to device
+- `./gradlew android:run` - Install and launch on device
+- `./gradlew android:clean` - Clean Android build artifacts
+
 ## Running the Game
 
-### From Standalone JAR
+### Desktop: From Standalone JAR
 After building, run the distribution JAR:
 ```bash
 java -jar desktop/build/libs/desktop-1.0.jar
 ```
 
-### From Source (Development)
+### Desktop: From Source (Development)
 Run directly without building JAR:
 ```bash
 # Linux/macOS
@@ -263,8 +375,30 @@ Run directly without building JAR:
 gradlew.bat desktop:run
 ```
 
-### Running with Custom Maps
+### Android: Install and Run
+After building the APK, install it on your Android device:
+
+**Via ADB (Android Debug Bridge):**
+```bash
+adb install android/build/outputs/apk/debug/android-debug.apk
+```
+
+**Via Gradle:**
+```bash
+./gradlew android:installDebug android:run
+```
+
+**Manual Installation:**
+1. Transfer the APK file to your Android device
+2. Enable "Install from Unknown Sources" in Android settings
+3. Open the APK file and tap "Install"
+4. Find "NOT ANOTHER TOPDOWN SHOOTER" in your app drawer
+5. Tap to launch
+
+### Running with Custom Maps (Desktop Only)
 Place your custom `.map` files in the same directory as the JAR, or use the in-game "Choose Level" option to browse for map files.
+
+**Note**: Custom map loading is currently only available on desktop version.
 
 ## Project Structure
 
@@ -278,6 +412,7 @@ IGPEGame/
 │   │       ├── GUI/          # User interface and screens
 │   │       │   ├── screens/  # Game screens (menu, gameplay, etc.)
 │   │       │   ├── HUD/      # Heads-up display
+│   │       │   ├── TouchController.java  # Mobile touch controls
 │   │       │   └── Assets.java
 │   │       ├── logic/        # Game objects (Player, Enemy, Weapon)
 │   │       ├── MapUtils/     # Map loading and world management
@@ -293,7 +428,19 @@ IGPEGame/
 │   ├── Default.map          # Default game map
 │   ├── arena.map            # Arena map
 │   └── Tutorial.map         # Tutorial map
+├── android/                  # Android launcher
+│   ├── src/                 # Android-specific code
+│   │   └── it/unical/igpe/android/
+│   │       └── AndroidLauncher.java
+│   ├── res/                 # Android resources
+│   │   ├── drawable-*/      # App icons for different densities
+│   │   └── values/          # Strings and styles
+│   ├── assets/              # Maps (symlinked to core/assets)
+│   ├── AndroidManifest.xml  # Android app manifest
+│   ├── build.gradle         # Android build configuration
+│   └── proguard-rules.pro   # ProGuard rules for release builds
 ├── build.gradle             # Root Gradle build configuration
+├── settings.gradle          # Gradle project settings
 └── gradle/                  # Gradle wrapper files
 ```
 
@@ -303,10 +450,11 @@ IGPEGame/
 - **Game Framework**: LibGDX 1.9.6
 - **Language**: Java 8
 - **Build System**: Gradle 8.14
-- **Graphics API**: OpenGL
+- **Graphics API**: OpenGL / OpenGL ES (Android)
 - **Physics**: Custom collision detection
 - **AI**: A* pathfinding algorithm
 - **Networking**: LibGDX networking for multiplayer
+- **Platform Support**: Desktop (Windows, macOS, Linux) and Android
 
 ### Key Classes
 
@@ -314,6 +462,10 @@ IGPEGame/
 - `IGPEGame` - Main game class and entry point
 - `ScreenManager` - Manages game screen transitions
 - `GameConfig` - Global configuration constants
+
+#### Platform Launchers
+- `DesktopLauncher` - Desktop platform initialization
+- `AndroidLauncher` - Android platform initialization
 
 #### Game Objects
 - `Player` - Player character with weapons and abilities
@@ -323,9 +475,15 @@ IGPEGame/
 - `Tile` - Environmental objects and obstacles
 - `Lootable` - Collectible items (health, ammo, keys)
 
+#### Input & Controls
+- `TouchController` - Multi-touch input handler for mobile devices
+  - Virtual joystick for movement
+  - On-screen buttons for actions
+  - Multi-touch support for simultaneous actions
+
 #### Map System
 - `World` - Game world container and update logic
-- `WorldLoader` - Loads maps from .map files
+- `WorldLoader` - Loads maps from .map files (supports internal resources)
 - `WorldRenderer` - Renders game world and entities
 
 #### AI System

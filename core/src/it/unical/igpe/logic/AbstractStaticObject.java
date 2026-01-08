@@ -1,6 +1,6 @@
 package it.unical.igpe.logic;
 
-import java.awt.Rectangle;
+import com.badlogic.gdx.math.Rectangle;
 
 import com.badlogic.gdx.math.Vector2;
 
@@ -25,11 +25,11 @@ public abstract class AbstractStaticObject {
 	}
 	
 	public int getX() {
-		return boundingBox.x;
+		return (int) boundingBox.x;
 	}
-	
+
 	public int getY() {
-		return boundingBox.y;
+		return (int) boundingBox.y;
 	}
 	
 	public void setX(int x) {

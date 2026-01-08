@@ -1,6 +1,6 @@
 package it.unical.igpe.net;
 
-import java.awt.Rectangle;
+import com.badlogic.gdx.math.Rectangle;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.LinkedList;
@@ -50,9 +50,16 @@ public class MultiplayerWorld implements Updatable {
 
 		manager = new WorldLoader(32, 32);
 		try {
+			it.unical.igpe.utils.DebugUtils.showMessage("Loading multiplayer map: " + path);
 			manager.LoadMap(path);
+			it.unical.igpe.utils.DebugUtils.showMessage("Multiplayer map loaded successfully");
 		} catch (IOException e) {
-			System.out.println("Map not found");
+			it.unical.igpe.utils.DebugUtils.showError("Map not found: " + path, e);
+			System.out.println("Map not found: " + path);
+			throw new RuntimeException("Failed to load map: " + path, e);
+		} catch (Exception e) {
+			it.unical.igpe.utils.DebugUtils.showError("Error loading multiplayer map: " + path, e);
+			throw new RuntimeException("Failed to load map: " + path, e);
 		}
 
 		for (int x = 0; x < manager.map.length; x++)
@@ -78,15 +85,27 @@ public class MultiplayerWorld implements Updatable {
 			}
 
 		if (!isServer) {
-			player = new PlayerMP(randomSpawn(), this, username, null, -1);
-			this.addEntity(player);
-			Packet00Login loginPacket = new Packet00Login(player.getUsername(), player.getBoundingBox().x,
-					player.getBoundingBox().y);
-			// If the client has started a server, add it as a connection
-			if (IGPEGame.game.socketServer != null) {
-				IGPEGame.game.socketServer.addConnection((PlayerMP) player, loginPacket);
+			try {
+				it.unical.igpe.utils.DebugUtils.showMessage("Creating multiplayer client player: " + username);
+				player = new PlayerMP(randomSpawn(), this, username, null, -1);
+				this.addEntity(player);
+				Packet00Login loginPacket = new Packet00Login(player.getUsername(), (int) player.getBoundingBox().x,
+						(int) player.getBoundingBox().y);
+				// If the client has started a server, add it as a connection
+				if (IGPEGame.game.socketServer != null) {
+					it.unical.igpe.utils.DebugUtils.showMessage("Adding connection to local server");
+					IGPEGame.game.socketServer.addConnection((PlayerMP) player, loginPacket);
+				}
+				if (IGPEGame.game.socketClient != null) {
+					loginPacket.writeData(IGPEGame.game.socketClient);
+					it.unical.igpe.utils.DebugUtils.showMessage("Login packet sent to server");
+				} else {
+					it.unical.igpe.utils.DebugUtils.showError("socketClient is null, cannot send login packet");
+				}
+			} catch (Exception e) {
+				it.unical.igpe.utils.DebugUtils.showError("Error creating multiplayer client player", e);
+				throw e;
 			}
-			loginPacket.writeData(IGPEGame.game.socketClient);
 		}
 	}
 
@@ -116,7 +135,7 @@ public class MultiplayerWorld implements Updatable {
 					while (iter.hasNext()) {
 						PlayerMP a = (PlayerMP) iter.next();
 						if (!b.getID().equalsIgnoreCase(((PlayerMP) a).getUsername())
-								&& b.getBoundingBox().intersects(a.getBoundingBox()) && a.Alive()) {
+								&& b.getBoundingBox().overlaps(a.getBoundingBox()) && a.Alive()) {
 							it.remove();
 							removed = true;
 							if (a.getUsername() == this.player.getUsername()) {
@@ -145,9 +164,9 @@ public class MultiplayerWorld implements Updatable {
 			if (Math.sqrt(Math.pow((_box.x - tile.getBoundingBox().x), 2)
 					+ Math.pow(_box.y - tile.getBoundingBox().y, 2)) < 128) {
 				if (tile.getType() != TileType.GROUND && tile.getType() != TileType.ENDLEVEL
-						&& _box.intersects(tile.getBoundingBox()))
+						&& _box.overlaps(tile.getBoundingBox()))
 					return TileType.WALL;
-				else if (tile.getType() == TileType.ENDLEVEL && _box.intersects(tile.getBoundingBox()))
+				else if (tile.getType() == TileType.ENDLEVEL && _box.overlaps(tile.getBoundingBox()))
 					return TileType.ENDLEVEL;
 			}
 		}

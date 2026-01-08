@@ -29,8 +29,10 @@ public class MultiplayerWorldRenderer {
 	public static Vector2 shotPos;
 	
 	private OrthographicCamera camera;
+	public OrthographicCamera getCamera() { return camera; }
 	public Viewport viewport;
 	private SpriteBatch batch;
+	public SpriteBatch getBatch() { return batch; }
 	private ShapeRenderer sr;
 	private float stateTime;
 	private MultiplayerWorld world;
@@ -169,13 +171,15 @@ public class MultiplayerWorldRenderer {
 		batch.setColor(1f, 1f, 1f, 0.7f);
 
 		// Drawing Bullets
+		com.badlogic.gdx.graphics.GL20 gl = com.badlogic.gdx.Gdx.gl;
+		gl.glEnable(com.badlogic.gdx.graphics.GL20.GL_BLEND);
+		gl.glBlendFunc(com.badlogic.gdx.graphics.GL20.GL_SRC_ALPHA, com.badlogic.gdx.graphics.GL20.GL_ONE_MINUS_SRC_ALPHA);
 		sr.begin(ShapeType.Filled);
-		for (
-
-		Bullet bullet : world.getBls()) {
-			sr.circle(bullet.getBoundingBox().x, bullet.getBoundingBox().y, 4);
+		for (Bullet bullet : world.getBls()) {
+			sr.circle(bullet.getX(), bullet.getY(), 4);
 		}
 		sr.end();
+		gl.glDisable(com.badlogic.gdx.graphics.GL20.GL_BLEND);
 		
 		if(pistolShot)
 			this.firePistol();

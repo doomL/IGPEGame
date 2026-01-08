@@ -15,6 +15,6 @@ public class DesktopLauncher {
 		cfg.width = GameConfig.WIDTH;
 		cfg.height = GameConfig.HEIGHT;
 		cfg.addIcon("icon.png", Files.FileType.Internal);
-		new LwjglApplication(new IGPEGame(), cfg);
+		new LwjglApplication(new IGPEGame(new DesktopFilePicker()), cfg);
 	}
 }

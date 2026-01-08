@@ -1,9 +1,6 @@
 package it.unical.igpe.GUI.screens;
 
-import java.io.File;
-
-import javax.swing.JFileChooser;
-
+import com.badlogic.gdx.Application;
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.Screen;
 import com.badlogic.gdx.graphics.GL20;
@@ -16,6 +13,7 @@ import com.badlogic.gdx.scenes.scene2d.ui.TextButton;
 import com.badlogic.gdx.scenes.scene2d.utils.ChangeListener;
 
 import it.unical.igpe.game.IGPEGame;
+import it.unical.igpe.utils.FilePicker;
 import it.unical.igpe.utils.GameConfig;
 
 public class LevelChooseScreen implements Screen {
@@ -54,23 +52,38 @@ public class LevelChooseScreen implements Screen {
 
 			@Override
 			public void changed(ChangeEvent event, Actor actor) {
-				if(GameConfig.isFullscreen)
-					Gdx.graphics.setWindowedMode(GameConfig.WIDTH, GameConfig.HEIGHT);
-				
-				JFileChooser fileChooser = new JFileChooser();
-				fileChooser.setCurrentDirectory(new File("."));
-				fileChooser.setAcceptAllFileFilterUsed(false);
-				fileChooser.showOpenDialog(fileChooser);
-				File file = fileChooser.getSelectedFile();
-				if (file != null) {
-					ScreenManager.GS = new GameScreen(file.getPath());
+				if (IGPEGame.filePicker == null) {
+					// File picker not available (shouldn't happen, but handle gracefully)
+					return;
+				}
+
+				// Desktop-specific fullscreen handling
+				if (Gdx.app.getType() == Application.ApplicationType.Desktop) {
 					if(GameConfig.isFullscreen)
-						Gdx.graphics.setFullscreenMode(Gdx.graphics.getDisplayMode());
-					IGPEGame.game.setScreen(ScreenManager.LS);
+						Gdx.graphics.setWindowedMode(GameConfig.WIDTH, GameConfig.HEIGHT);
 				}
-				else if(file == null && GameConfig.isFullscreen) {
-					Gdx.graphics.setFullscreenMode(Gdx.graphics.getDisplayMode());
-				}
+				
+				IGPEGame.filePicker.pickFile(new FilePicker.FilePickerCallback() {
+					@Override
+					public void onFileSelected(String filePath) {
+						// Desktop-specific fullscreen handling
+						if (Gdx.app.getType() == Application.ApplicationType.Desktop) {
+							if(GameConfig.isFullscreen)
+								Gdx.graphics.setFullscreenMode(Gdx.graphics.getDisplayMode());
+						}
+						ScreenManager.GS = new GameScreen(filePath);
+						IGPEGame.game.setScreen(ScreenManager.LS);
+					}
+
+					@Override
+					public void onCancelled() {
+						// Desktop-specific fullscreen handling
+						if (Gdx.app.getType() == Application.ApplicationType.Desktop) {
+							if(GameConfig.isFullscreen)
+								Gdx.graphics.setFullscreenMode(Gdx.graphics.getDisplayMode());
+						}
+					}
+				});
 			}
 		});
 

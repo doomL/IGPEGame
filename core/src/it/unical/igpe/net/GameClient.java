@@ -27,28 +27,43 @@ public class GameClient extends Thread {
 
 	public GameClient(String ipAddress, int port) {
 		try {
+			it.unical.igpe.utils.DebugUtils.showMessage("Connecting to server: " + ipAddress + ":" + port);
 			this.socket = new DatagramSocket();
 			this.ipAddress = InetAddress.getByName(ipAddress);
 			this.port = port;
 			System.out.println("Connected to server " + ipAddress);
+			it.unical.igpe.utils.DebugUtils.showMessage("GameClient created successfully");
 		} catch (UnknownHostException e) {
+			it.unical.igpe.utils.DebugUtils.showError("Unknown host: " + ipAddress, e);
 			e.printStackTrace();
 		} catch (SocketException e1) {
+			it.unical.igpe.utils.DebugUtils.showError("Socket error creating GameClient", e1);
 			e1.printStackTrace();
+		} catch (Exception e) {
+			it.unical.igpe.utils.DebugUtils.showError("Unexpected error creating GameClient", e);
+			e.printStackTrace();
 		}
 	}
 	
 	public void run() {
+		it.unical.igpe.utils.DebugUtils.showMessage("GameClient thread started");
 		while(true) {
 			byte[] data = new byte[1024];
 			DatagramPacket packet = new DatagramPacket(data, data.length);
 			try {
 				socket.receive(packet);
 			} catch (IOException e) {
+				it.unical.igpe.utils.DebugUtils.showError("Error receiving packet in GameClient", e);
 				e.printStackTrace();
+				break; // Exit loop on error
+			} catch (Exception e) {
+				it.unical.igpe.utils.DebugUtils.showError("Unexpected error in GameClient.run()", e);
+				e.printStackTrace();
+				break;
 			}
 			this.parsePacket(packet.getData(), packet.getAddress(), packet.getPort());
 		}
+		it.unical.igpe.utils.DebugUtils.showMessage("GameClient thread ended");
 	}
 	
 	public void sendData(byte[] data) {

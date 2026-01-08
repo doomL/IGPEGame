@@ -143,15 +143,73 @@ public class MultiScreen implements Screen {
 
 			@Override
 			public void changed(ChangeEvent event, Actor actor) {
-				IGPEGame.game.socketServer = new GameServer(Integer.parseInt(PortServerText.getText()));
-				IGPEGame.game.socketServer.MaxKills = Integer.parseInt(serverKills.getText());
-				IGPEGame.game.socketServer.start();
-				IGPEGame.game.socketClient = new GameClient("127.0.0.1", Integer.parseInt(PortServerText.getText()));
-				IGPEGame.game.socketClient.start();
-				MultiplayerWorld.username = serverNameText.getText();
-				ScreenManager.CreateMGS();
-				LoadingScreen.isMP = true;
-				IGPEGame.game.setScreen(ScreenManager.LS);
+				try {
+					it.unical.igpe.utils.DebugUtils.showMessage("Starting server creation...");
+					
+					// Validate inputs
+					String portText = PortServerText.getText();
+					String killsText = serverKills.getText();
+					String usernameText = serverNameText.getText();
+					
+					if (portText == null || portText.trim().isEmpty()) {
+						it.unical.igpe.utils.DebugUtils.showError("Port cannot be empty");
+						return;
+					}
+					if (killsText == null || killsText.trim().isEmpty()) {
+						it.unical.igpe.utils.DebugUtils.showError("Max kills cannot be empty");
+						return;
+					}
+					if (usernameText == null || usernameText.trim().isEmpty()) {
+						it.unical.igpe.utils.DebugUtils.showError("Username cannot be empty");
+						return;
+					}
+					
+					int port = Integer.parseInt(portText);
+					int maxKills = Integer.parseInt(killsText);
+					
+					it.unical.igpe.utils.DebugUtils.showMessage("Creating GameServer on port: " + port);
+					IGPEGame.game.socketServer = new GameServer(port);
+					
+					if (IGPEGame.game.socketServer == null) {
+						it.unical.igpe.utils.DebugUtils.showError("Failed to create GameServer");
+						return;
+					}
+					
+					IGPEGame.game.socketServer.MaxKills = maxKills;
+					it.unical.igpe.utils.DebugUtils.showMessage("Starting server thread...");
+					IGPEGame.game.socketServer.start();
+					
+					// Wait a bit for server to initialize
+					try {
+						Thread.sleep(100);
+					} catch (InterruptedException e) {
+						Thread.currentThread().interrupt();
+					}
+					
+					it.unical.igpe.utils.DebugUtils.showMessage("Creating GameClient...");
+					// On Android, use localhost IP or device IP
+					String serverIP = "127.0.0.1";
+					IGPEGame.game.socketClient = new GameClient(serverIP, port);
+					
+					if (IGPEGame.game.socketClient == null) {
+						it.unical.igpe.utils.DebugUtils.showError("Failed to create GameClient");
+						return;
+					}
+					
+					it.unical.igpe.utils.DebugUtils.showMessage("Starting client thread...");
+					IGPEGame.game.socketClient.start();
+					
+					MultiplayerWorld.username = usernameText;
+					it.unical.igpe.utils.DebugUtils.showMessage("Creating multiplayer game screen...");
+					ScreenManager.CreateMGS();
+					LoadingScreen.isMP = true;
+					IGPEGame.game.setScreen(ScreenManager.LS);
+					it.unical.igpe.utils.DebugUtils.showMessage("Server created successfully!");
+				} catch (NumberFormatException e) {
+					it.unical.igpe.utils.DebugUtils.showError("Invalid number format (port or kills)", e);
+				} catch (Exception e) {
+					it.unical.igpe.utils.DebugUtils.showError("Error creating server", e);
+				}
 			}
 		});
 

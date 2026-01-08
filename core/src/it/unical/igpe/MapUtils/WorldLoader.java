@@ -14,16 +14,36 @@ public class WorldLoader {
 	}
 
 	public void LoadMap(String path) throws IOException {
-		FileHandle fileHandle = Gdx.files.internal(path);
-		BufferedReader br = new BufferedReader(fileHandle.reader());
-		for (int i = 0; i < map[0].length; i++) {
-			String line = null;
-			line = br.readLine();
-			String[] tokens = line.split(" ");
-			for (int j = 0; j < tokens.length; j++) {
-				this.map[j][i] = Integer.parseInt(tokens[j]);
+		try {
+			it.unical.igpe.utils.DebugUtils.showMessage("Loading map: " + path);
+			FileHandle fileHandle = Gdx.files.internal(path);
+			
+			if (!fileHandle.exists()) {
+				throw new IOException("Map file does not exist: " + path);
 			}
+			
+			BufferedReader br = new BufferedReader(fileHandle.reader());
+			for (int i = 0; i < map[0].length; i++) {
+				String line = null;
+				line = br.readLine();
+				if (line == null) {
+					br.close();
+					throw new IOException("Map file is incomplete or corrupted: " + path);
+				}
+				String[] tokens = line.split(" ");
+				for (int j = 0; j < tokens.length; j++) {
+					this.map[j][i] = Integer.parseInt(tokens[j]);
+				}
+			}
+			br.close();
+			it.unical.igpe.utils.DebugUtils.showMessage("Map loaded successfully: " + path);
+		} catch (NumberFormatException e) {
+			throw new IOException("Map file contains invalid data: " + path, e);
+		} catch (Exception e) {
+			if (e instanceof IOException) {
+				throw e;
+			}
+			throw new IOException("Error reading map file: " + path, e);
 		}
-		br.close();
 	}
 }

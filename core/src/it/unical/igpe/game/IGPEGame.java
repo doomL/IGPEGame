@@ -13,6 +13,7 @@ import it.unical.igpe.net.GameClient;
 import it.unical.igpe.net.GameServer;
 import it.unical.igpe.net.MultiplayerWorld;
 import it.unical.igpe.net.packet.Packet01Disconnect;
+import it.unical.igpe.utils.FilePicker;
 import it.unical.igpe.utils.GameConfig;
 
 public class IGPEGame extends Game implements Disposable {
@@ -25,11 +26,20 @@ public class IGPEGame extends Game implements Disposable {
 	public static Skin skinsoldier;
 	public static Skin skinComic;
 	public static Skin skinUi;
+	public static FilePicker filePicker;
 
 	private Preferences prefs;
 	public MultiplayerWorld worldMP;
 	public GameClient socketClient;
 	public GameServer socketServer;
+
+	public IGPEGame() {
+		// Default constructor for backward compatibility
+	}
+
+	public IGPEGame(FilePicker filePicker) {
+		IGPEGame.filePicker = filePicker;
+	}
 
 	@Override
 	public void create() {

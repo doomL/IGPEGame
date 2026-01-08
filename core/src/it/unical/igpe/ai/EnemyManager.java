@@ -1,6 +1,6 @@
 package it.unical.igpe.ai;
 
-import java.awt.Rectangle;
+import com.badlogic.gdx.math.Rectangle;
 import java.util.Iterator;
 import java.util.LinkedList;
 
@@ -84,7 +84,7 @@ public class EnemyManager implements Updatable {
 	 */
 	public static boolean collisionsEnemy(Rectangle _box, Enemy act) {
 		for (Enemy e : ens) {
-			if (e.Alive() && e != act && e.getBoundingBox().intersects(_box))
+			if (e.Alive() && e != act && e.getBoundingBox().overlaps(_box))
 				return true;
 		}
 		return false;

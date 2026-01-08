@@ -1,6 +1,6 @@
 package it.unical.igpe.logic;
 
-import java.awt.Rectangle;
+import com.badlogic.gdx.math.Rectangle;
 import com.badlogic.gdx.math.Vector2;
 
 import it.unical.igpe.utils.GameConfig;

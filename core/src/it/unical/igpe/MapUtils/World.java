@@ -1,6 +1,6 @@
 package it.unical.igpe.MapUtils;
 
-import java.awt.Rectangle;
+import com.badlogic.gdx.math.Rectangle;
 import java.io.IOException;
 import java.util.Iterator;
 import java.util.LinkedList;
@@ -50,7 +50,11 @@ public class World implements Updatable {
 		try {
 			manager.LoadMap(path);
 		} catch (IOException e) {
-			System.out.println("Map not found");
+			it.unical.igpe.utils.DebugUtils.showError("Failed to load map: " + path, e);
+			System.out.println("Map not found: " + path);
+			IGPEGame.game.setScreen(ScreenManager.LCS);
+		} catch (Exception e) {
+			it.unical.igpe.utils.DebugUtils.showError("Unexpected error loading map: " + path, e);
 			IGPEGame.game.setScreen(ScreenManager.LCS);
 		}
 
@@ -134,7 +138,7 @@ public class World implements Updatable {
 				b.update(delta);
 				while (iter.hasNext()) {
 					Enemy e = iter.next();
-					if (b.getBoundingBox().intersects(e.getBoundingBox()) && e.Alive() && b.getID() == "player") {
+					if (b.getBoundingBox().overlaps(e.getBoundingBox()) && e.Alive() && b.getID() == "player") {
 						it.remove();
 						e.hit(b.getHP());
 						removed = true;
@@ -146,7 +150,7 @@ public class World implements Updatable {
 				}
 				if (removed)
 					continue;
-				if (b.getBoundingBox().intersects(player.getBoundingBox()) && b.getID() == "enemy") {
+				if (b.getBoundingBox().overlaps(player.getBoundingBox()) && b.getID() == "enemy") {
 					it.remove();
 					player.hit(b.getHP());
 					continue;
@@ -161,7 +165,7 @@ public class World implements Updatable {
 		Iterator<Lootable> itl = lootables.iterator();
 		while (itl.hasNext()) {
 			Lootable l = itl.next();
-			if (l.getBoundingBox().intersects(player.getBoundingBox())) {
+			if (l.getBoundingBox().overlaps(player.getBoundingBox())) {
 				if (l.getType() == LootableType.HEALTPACK && player.getHP() < 100) {
 					player.setHP(player.getHP() + 25);
 					SoundManager.manager.get(SoundManager.HealthRestored, Sound.class).play(GameConfig.SOUND_VOLUME);
@@ -191,9 +195,9 @@ public class World implements Updatable {
 		for (Tile tile : tiles) {
 			if (Math.sqrt(Math.pow((_box.x - tile.getBoundingBox().x), 2)
 					+ Math.pow(_box.y - tile.getBoundingBox().y, 2)) < 128) {
-				if (tile.getType() != TileType.GROUND && tile.getType() != TileType.ENDLEVEL && _box.intersects(tile.getBoundingBox()))
+				if (tile.getType() != TileType.GROUND && tile.getType() != TileType.ENDLEVEL && _box.overlaps(tile.getBoundingBox()))
 					return TileType.WALL;
-				else if (tile.getType() == TileType.ENDLEVEL && _box.intersects(tile.getBoundingBox()))
+				else if (tile.getType() == TileType.ENDLEVEL && _box.overlaps(tile.getBoundingBox()))
 					return TileType.ENDLEVEL;
 			}
 		}

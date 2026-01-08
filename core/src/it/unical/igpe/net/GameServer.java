@@ -28,22 +28,47 @@ public class GameServer extends Thread {
 
 	public GameServer(int port) {
 		try {
+			it.unical.igpe.utils.DebugUtils.showMessage("Creating server on port: " + port);
 			this.socket = new DatagramSocket(port);
 			System.out.println("Creating Server...");
-			this.worldMP = new MultiplayerWorld("Arena.map", true);
+			it.unical.igpe.utils.DebugUtils.showMessage("Socket created, loading multiplayer world...");
+			try {
+				this.worldMP = new MultiplayerWorld("arena.map", true);
+				it.unical.igpe.utils.DebugUtils.showMessage("GameServer created successfully");
+			} catch (Exception e) {
+				it.unical.igpe.utils.DebugUtils.showError("Failed to load multiplayer world", e);
+				// Close socket if world creation fails
+				if (this.socket != null && !this.socket.isClosed()) {
+					this.socket.close();
+				}
+				throw e; // Re-throw to indicate failure
+			}
 		} catch (SocketException e1) {
+			it.unical.igpe.utils.DebugUtils.showError("Socket error creating GameServer on port: " + port, e1);
 			e1.printStackTrace();
+			this.socket = null; // Mark as failed
+		} catch (Exception e) {
+			it.unical.igpe.utils.DebugUtils.showError("Unexpected error creating GameServer", e);
+			e.printStackTrace();
+			this.socket = null; // Mark as failed
 		}
 	}
 
 	public void run() {
+		it.unical.igpe.utils.DebugUtils.showMessage("GameServer thread started");
 		while (true) {
 			byte[] data = new byte[1024];
 			DatagramPacket packet = new DatagramPacket(data, data.length);
 			try {
 				socket.receive(packet);
 			} catch (IOException e) {
+				it.unical.igpe.utils.DebugUtils.showError("Error receiving packet in GameServer", e);
 				e.printStackTrace();
+				break; // Exit loop on error
+			} catch (Exception e) {
+				it.unical.igpe.utils.DebugUtils.showError("Unexpected error in GameServer.run()", e);
+				e.printStackTrace();
+				break;
 			}
 			this.parsePacket(packet.getData(), packet.getAddress(), packet.getPort());
 			for (PlayerMP p : connectedPlayers) {
@@ -152,7 +177,7 @@ public class GameServer extends Thread {
 			}
 			sendData(packet.getData(), p.ipAddress, p.port);
 
-			Packet newPacket = new Packet00Login(p.getUsername(), p.getBoundingBox().x, p.getBoundingBox().y);
+			Packet newPacket = new Packet00Login(p.getUsername(), (int) p.getBoundingBox().x, (int) p.getBoundingBox().y);
 			sendData(newPacket.getData(), player.ipAddress, player.port);
 		}
 		if (!alreadyConnected) {
