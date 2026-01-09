@@ -7,7 +7,6 @@ import com.badlogic.gdx.backends.android.AndroidApplicationConfiguration;
 import it.unical.igpe.game.IGPEGame;
 
 public class AndroidLauncher extends AndroidApplication {
-	public static final int FILE_PICKER_REQUEST_CODE = 1001;
 	private AndroidFilePicker filePicker;
 
 	@Override
@@ -29,8 +28,8 @@ public class AndroidLauncher extends AndroidApplication {
 	protected void onActivityResult(int requestCode, int resultCode, Intent data) {
 		super.onActivityResult(requestCode, resultCode, data);
 
-		if (requestCode == FILE_PICKER_REQUEST_CODE && filePicker != null) {
-			filePicker.handleActivityResult(resultCode, data);
+		if (filePicker != null && (requestCode == 1001 || requestCode == 1002)) {
+			filePicker.handleActivityResult(requestCode, resultCode, data);
 		}
 	}
 }

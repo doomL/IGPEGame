@@ -2,6 +2,7 @@ package it.unical.igpe.net;
 
 import java.util.ArrayList;
 import java.util.Iterator;
+import java.util.LinkedList;
 import java.util.List;
 
 import com.badlogic.gdx.audio.Sound;
@@ -43,8 +44,17 @@ public class MultiplayerWorldRenderer {
 		this.world = world;
 		this.camera = new OrthographicCamera();
 		this.camera.setToOrtho(true, 800, 800);
-		this.camera.position.x = world.player.getX();
-		this.camera.position.y = world.player.getY();
+		// Only set camera position if player exists (client side)
+		// Use getPlayer() which is safer
+		PlayerMP player = world.getPlayer();
+		if (player != null) {
+			this.camera.position.x = player.getX();
+			this.camera.position.y = player.getY();
+		} else {
+			// Server side or player not created yet - use default position
+			this.camera.position.x = 400;
+			this.camera.position.y = 400;
+		}
 		this.viewport = new ExtendViewport(800, 800, camera);
 		this.batch = new SpriteBatch();
 		batch.setColor(1f, 1f, 1f, 0.7f);
@@ -57,14 +67,35 @@ public class MultiplayerWorldRenderer {
 		batch.setProjectionMatrix(camera.combined);
 		sr.setProjectionMatrix(camera.combined);
 
-		camera.position.x = world.getPlayer().getX();
-		camera.position.y = world.getPlayer().getY();
+		// Only update camera if player exists
+		if (world.getPlayer() != null) {
+			camera.position.x = world.getPlayer().getX();
+			camera.position.y = world.getPlayer().getY();
+		}
 		camera.update();
 
-		batch.begin();
+		// Begin batch (handle state errors)
+		try {
+			batch.begin();
+		} catch (IllegalStateException e) {
+			// Batch was already active, end it first
+			try {
+				batch.end();
+			} catch (Exception e2) {
+				// Ignore
+			}
+			batch.begin();
+		}
 
 		// Drawing tiles
-		for (Tile tile : world.getTiles()) {
+		LinkedList<Tile> tiles = world.getTiles();
+		if (tiles == null) {
+			it.unical.igpe.utils.DebugUtils.showError("Tiles list is null in renderer!", null);
+			batch.end();
+			return;
+		}
+		for (Tile tile : tiles) {
+			if (tile == null) continue;
 			batch.draw(Assets.manager.get(Assets.Ground, Texture.class), tile.getBoundingBox().x,
 						tile.getBoundingBox().y);
 			
@@ -86,12 +117,18 @@ public class MultiplayerWorldRenderer {
 		// Drawing players
 		batch.setColor(1f, 1f, 1f, 1f);
 		List<AbstractDynamicObject> entitiesCopy;
-		synchronized (world.getEntities()) {
-			entitiesCopy = new ArrayList<>(world.getEntities());
+		try {
+			synchronized (world.getEntities()) {
+				entitiesCopy = new ArrayList<>(world.getEntities());
+			}
+		} catch (Exception e) {
+			it.unical.igpe.utils.DebugUtils.showError("Error getting entities in renderer", e);
+			entitiesCopy = new ArrayList<>();
 		}
 		for (AbstractDynamicObject obj : entitiesCopy) {
-			if (!(obj instanceof PlayerMP)) continue;
+			if (obj == null || !(obj instanceof PlayerMP)) continue;
 			PlayerMP e = (PlayerMP) obj;
+			if (e == null) continue;
 			if (e.state == Player.STATE_RUNNING) {
 				e.timeToNextStep -= deltaTime;
 				if (e.timeToNextStep < 0) {
@@ -107,7 +144,7 @@ public class MultiplayerWorldRenderer {
 			} else {
 				e.timeToNextStep = 0;
 			}
-			if (e.getUsername().equalsIgnoreCase(MultiplayerWorld.username)) {
+			if (e.getUsername() != null && MultiplayerWorld.username != null && e.getUsername().equalsIgnoreCase(MultiplayerWorld.username)) {
 				if (e.getActWeapon() == "pistol") {
 					if (e.state == Player.STATE_IDLE)
 						batch.draw(Assets.idlePistolAnimation.getKeyFrame(stateTime, true), e.getBoundingBox().x,

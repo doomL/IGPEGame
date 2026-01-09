@@ -64,6 +64,8 @@ public class LevelChooseScreen implements Screen {
 				}
 				
 				IGPEGame.filePicker.pickFile(new FilePicker.FilePickerCallback() {
+					private boolean processing = false;
+					
 					@Override
 					public void onFileSelected(String filePath) {
 						// Desktop-specific fullscreen handling
@@ -73,6 +75,62 @@ public class LevelChooseScreen implements Screen {
 						}
 						ScreenManager.GS = new GameScreen(filePath);
 						IGPEGame.game.setScreen(ScreenManager.LS);
+					}
+
+					@Override
+					public void onFileSelectedWithContent(String filePath, String fileContent) {
+						// Prevent multiple calls
+						if (processing) {
+							it.unical.igpe.utils.DebugUtils.showMessage("Already processing file selection, ignoring duplicate call");
+							return;
+						}
+						processing = true;
+						
+						// Desktop-specific fullscreen handling
+						if (Gdx.app.getType() == Application.ApplicationType.Desktop) {
+							if(GameConfig.isFullscreen)
+								Gdx.graphics.setFullscreenMode(Gdx.graphics.getDisplayMode());
+						}
+						
+						it.unical.igpe.utils.DebugUtils.showMessage("=== Starting GameScreen creation ===");
+						it.unical.igpe.utils.DebugUtils.showMessage("Debug log file location: " + it.unical.igpe.utils.DebugUtils.getLogFilePath());
+						GameScreen newGameScreen = null;
+						try {
+							it.unical.igpe.utils.DebugUtils.showMessage("Creating GameScreen with map content (length: " + fileContent.length() + ")");
+							newGameScreen = new GameScreen(filePath, fileContent);
+							it.unical.igpe.utils.DebugUtils.showMessage("GameScreen object created successfully");
+							
+							// Only assign and switch if creation was successful
+							if (newGameScreen != null && newGameScreen.world != null) {
+								ScreenManager.GS = newGameScreen;
+								it.unical.igpe.utils.DebugUtils.showMessage("GameScreen assigned to ScreenManager");
+								// Use LoadingScreen for custom maps (it's safe and shows nice loading progress)
+								it.unical.igpe.utils.DebugUtils.showMessage("Switching to LoadingScreen (will transition to GameScreen when assets ready)");
+								com.badlogic.gdx.Gdx.app.postRunnable(new Runnable() {
+									@Override
+									public void run() {
+										IGPEGame.game.setScreen(ScreenManager.LS);
+									}
+								});
+							} else {
+								throw new RuntimeException("GameScreen or World is null after creation");
+							}
+						} catch (Exception e) {
+							it.unical.igpe.utils.DebugUtils.showError("Failed to create GameScreen with content: " + e.getMessage(), e);
+							e.printStackTrace();
+							com.badlogic.gdx.Gdx.app.error("MapLoad", "Failed to load map: " + e.getMessage(), e);
+							// Clear any partial GameScreen
+							if (ScreenManager.GS == newGameScreen) {
+								ScreenManager.GS = null;
+							}
+							// Stay on LevelChooseScreen if creation failed
+							if (Gdx.app.getType() == Application.ApplicationType.Desktop) {
+								if(GameConfig.isFullscreen)
+									Gdx.graphics.setFullscreenMode(Gdx.graphics.getDisplayMode());
+							}
+						} finally {
+							processing = false;
+						}
 					}
 
 					@Override

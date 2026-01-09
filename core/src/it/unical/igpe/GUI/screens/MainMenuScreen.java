@@ -24,6 +24,7 @@ public class MainMenuScreen implements Screen {
 	private TextButton singleButton;
 	private TextButton multiButton;
 	private TextButton optionButton;
+	private TextButton editorButton;
 	private TextButton quitButton;
 	
 	public MainMenuScreen() {
@@ -65,6 +66,15 @@ public class MainMenuScreen implements Screen {
 			}
 		});
 		
+		editorButton = new TextButton("Level Editor", IGPEGame.skinsoldier);
+		editorButton.addListener(new ChangeListener() {
+			
+			@Override
+			public void changed(ChangeEvent event, Actor actor) {
+				IGPEGame.game.setScreen(ScreenManager.ES);
+			}
+		});
+		
 		quitButton = new TextButton("Quit", IGPEGame.skinsoldier);
 		quitButton.addListener(new ChangeListener() {
 			
@@ -78,6 +88,8 @@ public class MainMenuScreen implements Screen {
 		table.add(singleButton);
 		table.row();
 		table.add(multiButton);
+		table.row();
+		table.add(editorButton);
 		table.row();
 		table.add(optionButton);
 		table.row();

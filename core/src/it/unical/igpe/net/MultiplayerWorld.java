@@ -26,6 +26,8 @@ import it.unical.igpe.utils.Updatable;
 
 public class MultiplayerWorld implements Updatable {
 	public static String username;
+	public static String serverMapName = "arena.map"; // Default, will be set by server
+	public static String serverMapContent = null; // Map content received from server
 	public boolean gameOver = false;
 	public static int keyCollected;
 	public PlayerMP player;
@@ -40,6 +42,10 @@ public class MultiplayerWorld implements Updatable {
 	public boolean isServer = false;
 
 	public MultiplayerWorld(String path, boolean isServer) {
+		this(path, null, isServer);
+	}
+	
+	public MultiplayerWorld(String path, String mapContent, boolean isServer) {
 		this.isServer = isServer;
 		tiles = new LinkedList<Tile>();
 		lootables = new LinkedList<Lootable>();
@@ -50,8 +56,13 @@ public class MultiplayerWorld implements Updatable {
 
 		manager = new WorldLoader(32, 32);
 		try {
-			it.unical.igpe.utils.DebugUtils.showMessage("Loading multiplayer map: " + path);
-			manager.LoadMap(path);
+			if (mapContent != null && !mapContent.isEmpty()) {
+				it.unical.igpe.utils.DebugUtils.showMessage("Loading multiplayer map from content (length: " + mapContent.length() + ")");
+				manager.LoadMapFromContent(mapContent);
+			} else {
+				it.unical.igpe.utils.DebugUtils.showMessage("Loading multiplayer map from path: " + path);
+				manager.LoadMap(path);
+			}
 			it.unical.igpe.utils.DebugUtils.showMessage("Multiplayer map loaded successfully");
 		} catch (IOException e) {
 			it.unical.igpe.utils.DebugUtils.showError("Map not found: " + path, e);

@@ -62,7 +62,18 @@ public class WorldRenderer {
 			world.getPlayer().timeToNextStep = 0;
 		}
 
-		batch.begin();
+		// Begin batch (LibGDX SpriteBatch handles state internally, but we'll be safe)
+		try {
+			batch.begin();
+		} catch (IllegalStateException e) {
+			// Batch was already active, end it first
+			try {
+				batch.end();
+			} catch (Exception e2) {
+				// Ignore
+			}
+			batch.begin();
+		}
 
 		// Drawing Tile
 		for (Tile tile : world.getTiles()) {

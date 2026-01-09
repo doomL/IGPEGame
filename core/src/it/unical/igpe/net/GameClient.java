@@ -19,6 +19,7 @@ import it.unical.igpe.net.packet.Packet02Move;
 import it.unical.igpe.net.packet.Packet03Fire;
 import it.unical.igpe.net.packet.Packet04Death;
 import it.unical.igpe.net.packet.Packet05GameOver;
+import it.unical.igpe.net.packet.Packet06MapData;
 
 public class GameClient extends Thread {
 	private InetAddress ipAddress;
@@ -110,6 +111,51 @@ public class GameClient extends Thread {
 			packet = new Packet05GameOver(data);
 			handleGameOver((Packet05GameOver) packet);
 			break;
+		case MAPDATA:
+			packet = new Packet06MapData(data);
+			handleMapData((Packet06MapData) packet);
+			break;
+		}
+	}
+	
+	private void handleMapData(Packet06MapData packet) {
+		String mapName = packet.getMapName();
+		String mapContent = packet.getMapContent();
+		
+		it.unical.igpe.utils.DebugUtils.showMessage("Received map data from server: " + mapName + (mapContent != null ? " (with content, length: " + mapContent.length() + ")" : ""));
+		
+		// Store map content directly (don't save to file)
+		if (mapContent != null && !mapContent.isEmpty()) {
+			// Store map content for use when creating MultiplayerWorld
+			MultiplayerWorld.serverMapName = mapName; // Store filename
+			MultiplayerWorld.serverMapContent = mapContent; // Store content
+			it.unical.igpe.utils.DebugUtils.showMessage("Stored map content for multiplayer world creation");
+		} else {
+			// No map content, just use the map name (try to load from assets)
+			MultiplayerWorld.serverMapName = mapName;
+			MultiplayerWorld.serverMapContent = null;
+		}
+		
+		// If worldMP doesn't exist yet, it will be created with this map
+		// If it exists, we need to reload it with the new map
+		if (IGPEGame.game.worldMP == null) {
+			// World will be created with this map
+			it.unical.igpe.utils.DebugUtils.showMessage("World not created yet, will use map: " + mapName + (mapContent != null ? " (from content)" : ""));
+		} else {
+			// World already exists, need to reload with new map
+			it.unical.igpe.utils.DebugUtils.showMessage("Reloading world with map: " + mapName);
+			try {
+				// Save player state before reloading
+				String username = IGPEGame.game.worldMP.player != null ? IGPEGame.game.worldMP.player.getUsername() : MultiplayerWorld.username;
+				Vector2 playerPos = IGPEGame.game.worldMP.player != null ? 
+					new Vector2(IGPEGame.game.worldMP.player.getBoundingBox().x, IGPEGame.game.worldMP.player.getBoundingBox().y) : null;
+				
+				IGPEGame.game.worldMP = new MultiplayerWorld(MultiplayerWorld.serverMapName, MultiplayerWorld.serverMapContent, false);
+				it.unical.igpe.utils.DebugUtils.showMessage("World reloaded with map: " + mapName + (mapContent != null ? " (from content)" : ""));
+				it.unical.igpe.utils.DebugUtils.showMessage("World reloaded with map: " + mapName);
+			} catch (Exception e) {
+				it.unical.igpe.utils.DebugUtils.showError("Failed to reload world with map: " + mapName, e);
+			}
 		}
 	}
 

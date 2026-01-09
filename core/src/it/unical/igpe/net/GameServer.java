@@ -1,5 +1,6 @@
 package it.unical.igpe.net;
 
+import java.io.BufferedReader;
 import java.io.IOException;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
@@ -8,6 +9,8 @@ import java.net.SocketException;
 import java.util.ArrayList;
 import java.util.List;
 
+import com.badlogic.gdx.Gdx;
+import com.badlogic.gdx.files.FileHandle;
 import com.badlogic.gdx.math.Vector2;
 
 import it.unical.igpe.game.IGPEGame;
@@ -19,21 +22,55 @@ import it.unical.igpe.net.packet.Packet02Move;
 import it.unical.igpe.net.packet.Packet03Fire;
 import it.unical.igpe.net.packet.Packet04Death;
 import it.unical.igpe.net.packet.Packet05GameOver;
+import it.unical.igpe.net.packet.Packet06MapData;
 
 public class GameServer extends Thread {
 	public MultiplayerWorld worldMP;
 	public int MaxKills;
 	private DatagramSocket socket;
 	private List<PlayerMP> connectedPlayers = new ArrayList<PlayerMP>();
+	private String mapName; // Map name sent to clients (filename)
+	private String serverMapPath; // Full path for server to load map (Desktop) or filename (Android)
+	private String serverMapContent; // Map content for server to load (Android)
 
 	public GameServer(int port) {
+		this(port, "arena.map", null); // Default map
+	}
+	
+	public GameServer(int port, String mapName) {
+		this(port, mapName, null);
+	}
+	
+	public GameServer(int port, String mapName, String mapContent) {
+		// Store map content if provided (Android), otherwise use path (Desktop)
+		this.serverMapContent = mapContent;
+		this.serverMapPath = mapName; // Use mapName as path for Desktop, or filename for Android
+		
+		// Extract just filename for client communication
+		String mapNameForClients = mapName;
+		if (mapName.contains("/")) {
+			mapNameForClients = mapName.substring(mapName.lastIndexOf("/") + 1);
+		}
+		if (mapName.contains("\\")) {
+			mapNameForClients = mapName.substring(mapName.lastIndexOf("\\") + 1);
+		}
+		// Keep .map extension
+		this.mapName = mapNameForClients;
+		
 		try {
-			it.unical.igpe.utils.DebugUtils.showMessage("Creating server on port: " + port);
+			it.unical.igpe.utils.DebugUtils.showMessage("Creating server on port: " + port + " with map: " + mapName);
 			this.socket = new DatagramSocket(port);
 			System.out.println("Creating Server...");
 			it.unical.igpe.utils.DebugUtils.showMessage("Socket created, loading multiplayer world...");
 			try {
-				this.worldMP = new MultiplayerWorld("arena.map", true);
+				// Use map content if available (Android), otherwise use path (Desktop)
+				if (serverMapContent != null && !serverMapContent.isEmpty()) {
+					it.unical.igpe.utils.DebugUtils.showMessage("Loading multiplayer world from content (length: " + serverMapContent.length() + ")");
+					this.worldMP = new MultiplayerWorld(serverMapPath, serverMapContent, true);
+				} else {
+					it.unical.igpe.utils.DebugUtils.showMessage("Loading multiplayer world from path: " + serverMapPath);
+					this.worldMP = new MultiplayerWorld(serverMapPath, true);
+				}
 				it.unical.igpe.utils.DebugUtils.showMessage("GameServer created successfully");
 			} catch (Exception e) {
 				it.unical.igpe.utils.DebugUtils.showError("Failed to load multiplayer world", e);
@@ -96,6 +133,26 @@ public class GameServer extends Thread {
 					new Vector2(((Packet00Login) packet).getX(), ((Packet00Login) packet).getY()),
 					IGPEGame.game.worldMP, ((Packet00Login) packet).getUsername(), address, port);
 			this.addConnection(player, (Packet00Login) packet);
+			// Send map data to the newly connected client
+			// Use stored map content if available (custom maps), otherwise send just map name (default maps in assets)
+			try {
+				if (serverMapContent != null && !serverMapContent.isEmpty()) {
+					// Custom map: send content
+					Packet06MapData mapPacket = new Packet06MapData(mapName, serverMapContent);
+					sendData(mapPacket.getData(), address, port);
+					it.unical.igpe.utils.DebugUtils.showMessage("Sent custom map data to client: " + mapName + " (" + serverMapContent.length() + " bytes)");
+				} else {
+					// Default map: just send name, client will load from assets
+					Packet06MapData mapPacket = new Packet06MapData(mapName);
+					sendData(mapPacket.getData(), address, port);
+					it.unical.igpe.utils.DebugUtils.showMessage("Sent default map name to client: " + mapName + " (client will load from assets)");
+				}
+			} catch (Exception e) {
+				it.unical.igpe.utils.DebugUtils.showError("Failed to send map data to client", e);
+				// Fallback: send just map name
+				Packet06MapData mapPacket = new Packet06MapData(mapName);
+				sendData(mapPacket.getData(), address, port);
+			}
 			break;
 		case DISCONNECT:
 			packet = new Packet01Disconnect(data);
@@ -118,6 +175,9 @@ public class GameServer extends Thread {
 		case GAMEOVER:
 			packet = new Packet05GameOver(data);
 			packet.writeData(this);
+			break;
+		case MAPDATA:
+			// Server receives map data (shouldn't happen, but handle gracefully)
 			break;
 		}
 	}
@@ -230,5 +290,49 @@ public class GameServer extends Thread {
 			index++;
 		}
 		return -1;
+	}
+	
+	/**
+	 * Load map file content as a string to send to clients
+	 */
+	private String loadMapContent(String mapPath) throws IOException {
+		FileHandle fileHandle = null;
+		
+		// Check if path is absolute or relative
+		if (mapPath.startsWith("/") || mapPath.startsWith("content://") || mapPath.startsWith("file://")) {
+			// Absolute path
+			if (mapPath.startsWith("/")) {
+				fileHandle = Gdx.files.absolute(mapPath);
+			} else if (mapPath.startsWith("file://")) {
+				String cleanPath = mapPath.substring(7);
+				fileHandle = Gdx.files.absolute(cleanPath);
+			} else {
+				throw new IOException("Cannot load from content URI: " + mapPath);
+			}
+		} else {
+			// Relative path - try internal first
+			fileHandle = Gdx.files.internal(mapPath);
+			if (!fileHandle.exists()) {
+				fileHandle = Gdx.files.external(mapPath);
+			}
+		}
+		
+		if (!fileHandle.exists()) {
+			throw new IOException("Map file does not exist: " + mapPath);
+		}
+		
+		// Read entire file content
+		BufferedReader br = new BufferedReader(fileHandle.reader());
+		StringBuilder content = new StringBuilder();
+		String line;
+		while ((line = br.readLine()) != null) {
+			if (content.length() > 0) {
+				content.append("\n");
+			}
+			content.append(line);
+		}
+		br.close();
+		
+		return content.toString();
 	}
 }

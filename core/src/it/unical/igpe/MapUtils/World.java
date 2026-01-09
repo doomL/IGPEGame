@@ -57,10 +57,52 @@ public class World implements Updatable {
 			it.unical.igpe.utils.DebugUtils.showError("Unexpected error loading map: " + path, e);
 			IGPEGame.game.setScreen(ScreenManager.LCS);
 		}
+	}
+	
+	public World(String path, String mapContent) {
+		player = new Player(new Vector2(), this, null);
+		tiles = new LinkedList<Tile>();
+		lootables = new LinkedList<Lootable>();
+		ens = new LinkedList<Enemy>();
+		bls = new LinkedList<Bullet>();
+		
+		finished = false;
+		keyCollected = 0;
 
-		for (int x = 0; x < manager.map.length; x++)
-			for (int y = 0; y < manager.map.length; y++) {
-				if (manager.map[x][y] == 0) // Ground
+		manager = new WorldLoader(GameConfig.TILEDIM, GameConfig.TILEDIM);
+		try {
+			if (mapContent != null && !mapContent.isEmpty()) {
+				it.unical.igpe.utils.DebugUtils.showMessage("Loading map from content, length: " + mapContent.length());
+				it.unical.igpe.utils.DebugUtils.showMessage("Content preview (first 200 chars): " + mapContent.substring(0, Math.min(200, mapContent.length())));
+				manager.LoadMapFromContent(mapContent);
+			} else {
+				it.unical.igpe.utils.DebugUtils.showMessage("Loading map from path: " + path);
+				manager.LoadMap(path);
+			}
+		} catch (IOException e) {
+			it.unical.igpe.utils.DebugUtils.showError("Failed to load map: " + path, e);
+			e.printStackTrace();
+			throw new RuntimeException("Failed to load map: " + path + " - " + e.getMessage(), e);
+		} catch (Exception e) {
+			it.unical.igpe.utils.DebugUtils.showError("Unexpected error loading map: " + path, e);
+			e.printStackTrace();
+			throw new RuntimeException("Unexpected error loading map: " + path + " - " + e.getMessage(), e);
+		}
+		
+		// Verify map was loaded
+		if (manager.map == null || manager.map.length == 0) {
+			throw new RuntimeException("Map array is null or empty after loading: " + path);
+		}
+		
+		it.unical.igpe.utils.DebugUtils.showMessage("Map verified, starting tile/enemy population. Map size: " + manager.map.length + "x" + (manager.map.length > 0 ? manager.map[0].length : 0));
+
+		// Map is int[height][width] = int[row][column]
+		// x is row, y is column
+		try {
+			int tileCount = 0;
+			for (int x = 0; x < manager.map.length; x++) {
+				for (int y = 0; y < (manager.map.length > 0 ? manager.map[0].length : 0); y++) {
+					if (manager.map[x][y] == 0) // Ground
 					tiles.add(new Tile(new Vector2(x * GameConfig.TILEDIM, y * GameConfig.TILEDIM), TileType.GROUND));
 				else if (manager.map[x][y] == 1) // Wall
 					tiles.add(new Tile(new Vector2(x * GameConfig.TILEDIM, y * GameConfig.TILEDIM), TileType.WALL));
@@ -112,9 +154,18 @@ public class World implements Updatable {
 				} else if (manager.map[x][y] == 16) { // Logs
 					tiles.add(new Tile(new Vector2(x * GameConfig.TILEDIM, y * GameConfig.TILEDIM), TileType.LOGS));
 				}
+					tileCount++;
+				}
 			}
+			it.unical.igpe.utils.DebugUtils.showMessage("Tile/enemy population completed. Created " + tileCount + " cells, " + tiles.size() + " total tiles, " + ens.size() + " enemies, " + lootables.size() + " lootables");
+		} catch (Exception e) {
+			it.unical.igpe.utils.DebugUtils.showError("Error during tile/enemy population", e);
+			e.printStackTrace();
+			throw new RuntimeException("Failed to populate world from map: " + e.getMessage(), e);
+		}
 		dir = new Vector2();
 		EM = new EnemyManager(this);
+		it.unical.igpe.utils.DebugUtils.showMessage("World constructor completed successfully");
 	}
 
 	@SuppressWarnings("static-access")
