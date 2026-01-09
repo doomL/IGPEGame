@@ -10,7 +10,10 @@ public class Packet00Login extends Packet{
 
 	public Packet00Login(byte[] data) {
 		super(00);
-		String[] dataArray = readData(data).split(","); 
+		String[] dataArray = readData(data).split(",");
+		if (dataArray.length < 3) {
+			throw new IllegalArgumentException("Invalid packet data: expected 3 fields, got " + dataArray.length);
+		}
 		this.username = dataArray[0];
 		this.x = Integer.parseInt(dataArray[1]);
 		this.y = Integer.parseInt(dataArray[2]);

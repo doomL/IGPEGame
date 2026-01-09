@@ -1,6 +1,8 @@
 package it.unical.igpe.net;
 
+import java.util.ArrayList;
 import java.util.Iterator;
+import java.util.List;
 
 import com.badlogic.gdx.audio.Sound;
 import com.badlogic.gdx.graphics.Color;
@@ -83,9 +85,13 @@ public class MultiplayerWorldRenderer {
 		
 		// Drawing players
 		batch.setColor(1f, 1f, 1f, 1f);
-		Iterator<AbstractDynamicObject> iter = world.entities.iterator();
-		while (iter.hasNext()) {
-			PlayerMP e = (PlayerMP) iter.next();
+		List<AbstractDynamicObject> entitiesCopy;
+		synchronized (world.getEntities()) {
+			entitiesCopy = new ArrayList<>(world.getEntities());
+		}
+		for (AbstractDynamicObject obj : entitiesCopy) {
+			if (!(obj instanceof PlayerMP)) continue;
+			PlayerMP e = (PlayerMP) obj;
 			if (e.state == Player.STATE_RUNNING) {
 				e.timeToNextStep -= deltaTime;
 				if (e.timeToNextStep < 0) {

@@ -125,11 +125,15 @@ public class GameServer extends Thread {
 	private void handleDeath(Packet04Death packet) {
 		if (getPlayerMP(packet.getUsernameKiller()) != null && getPlayerMP(packet.getUsernameKilled()) != null) {
 			int index = getPlayerMPIndex(packet.getUsernameKiller());
-			if(!packet.getUsernameKiller().equalsIgnoreCase(MultiplayerWorld.username))
+			if (index >= 0 && index < this.connectedPlayers.size() &&
+				!packet.getUsernameKiller().equalsIgnoreCase(MultiplayerWorld.username)) {
 				this.connectedPlayers.get(index).kills++;
+			}
 			index = getPlayerMPIndex(packet.getUsernameKilled());
-			if(!packet.getUsernameKilled().equalsIgnoreCase(MultiplayerWorld.username))
+			if (index >= 0 && index < this.connectedPlayers.size() &&
+				!packet.getUsernameKilled().equalsIgnoreCase(MultiplayerWorld.username)) {
 				this.connectedPlayers.get(index).deaths++;
+			}
 			packet.writeData(this);
 		}
 	}
@@ -141,27 +145,34 @@ public class GameServer extends Thread {
 	private void handleFire(Packet03Fire packet) {
 		if (getPlayerMP(packet.getUsername()) != null) {
 			int index = getPlayerMPIndex(packet.getUsername());
-			this.connectedPlayers.get(index).getBoundingBox().x = packet.getX();
-			this.connectedPlayers.get(index).getBoundingBox().y = packet.getY();
-			this.connectedPlayers.get(index).angle = packet.getAngle();
-			packet.writeData(this);
+			if (index >= 0 && index < this.connectedPlayers.size()) {
+				this.connectedPlayers.get(index).getBoundingBox().x = packet.getX();
+				this.connectedPlayers.get(index).getBoundingBox().y = packet.getY();
+				this.connectedPlayers.get(index).angle = packet.getAngle();
+				packet.writeData(this);
+			}
 		}
 	}
 
 	private void removeConnection(Packet01Disconnect packet) {
-		this.connectedPlayers.remove(getPlayerMPIndex(packet.getUsername()));
+		int index = getPlayerMPIndex(packet.getUsername());
+		if (index >= 0 && index < this.connectedPlayers.size()) {
+			this.connectedPlayers.remove(index);
+		}
 		packet.writeData(this);
 	}
 
 	private void handleMove(Packet02Move packet) {
 		if (getPlayerMP(packet.getUsername()) != null) {
 			int index = getPlayerMPIndex(packet.getUsername());
-			PlayerMP plMP = this.connectedPlayers.get(index);
-			plMP.getBoundingBox().x = packet.getX();
-			plMP.getBoundingBox().y = packet.getY();
-			plMP.angle = packet.getAngle();
-			plMP.state = packet.getState();
-			packet.writeData(this);
+			if (index >= 0 && index < this.connectedPlayers.size()) {
+				PlayerMP plMP = this.connectedPlayers.get(index);
+				plMP.getBoundingBox().x = packet.getX();
+				plMP.getBoundingBox().y = packet.getY();
+				plMP.angle = packet.getAngle();
+				plMP.state = packet.getState();
+				packet.writeData(this);
+			}
 		}
 	}
 
@@ -214,10 +225,10 @@ public class GameServer extends Thread {
 		int index = 0;
 		for (PlayerMP player : this.connectedPlayers) {
 			if (player.getUsername().equalsIgnoreCase(username)) {
-				break;
+				return index;
 			}
 			index++;
 		}
-		return index;
+		return -1;
 	}
 }

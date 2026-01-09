@@ -12,6 +12,9 @@ public class Packet03Fire extends Packet{
 	public Packet03Fire(byte[] data) {
 		super(03);
 		String[] dataArray = readData(data).split(",");
+		if (dataArray.length < 5) {
+			throw new IllegalArgumentException("Invalid packet data: expected 5 fields, got " + dataArray.length);
+		}
 		this.username = dataArray[0];
 		this.x = Integer.parseInt(dataArray[1]);
 		this.y = Integer.parseInt(dataArray[2]);

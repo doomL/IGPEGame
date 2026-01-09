@@ -11,6 +11,9 @@ public class Packet04Death extends Packet{
 	public Packet04Death(byte[] data) {
 		super(04);
 		String[] dataArray = readData(data).split(",");
+		if (dataArray.length < 2) {
+			throw new IllegalArgumentException("Invalid packet data: expected 2 fields, got " + dataArray.length);
+		}
 		this.usernameKiller = dataArray[0];
 		this.usernameKilled = dataArray[1];
 	}

@@ -175,13 +175,17 @@ public class MultiplayerWorld implements Updatable {
 
 	public synchronized void removePlayerMP(String username) {
 		int index = 0;
+		boolean found = false;
 		for (AbstractDynamicObject e : entities) {
 			if (e instanceof PlayerMP && ((PlayerMP) e).getUsername().equals(username)) {
+				found = true;
 				break;
 			}
 			index++;
 		}
-		this.getEntities().remove(index);
+		if (found && index < this.getEntities().size()) {
+			this.getEntities().remove(index);
+		}
 	}
 
 	public int getPlayerMPIndex(String username) {
@@ -192,23 +196,27 @@ public class MultiplayerWorld implements Updatable {
 			}
 			index++;
 		}
-		return 0;
+		return -1;
 	}
 
-	public void movePlayer(String username, int x, int y, float angle, int state, int weapon) {
+	public synchronized void movePlayer(String username, int x, int y, float angle, int state, int weapon) {
 		int index = getPlayerMPIndex(username);
-		if (index != getPlayerMPIndex(player.username)) {
-			PlayerMP p = (PlayerMP) this.getEntities().get(index);
-			p.getBoundingBox().x = x;
-			p.getBoundingBox().y = y;
-			p.angle = angle;
-			p.state = state;
-			if (weapon == 0)
-				p.activeWeapon = p.pistol;
-			else if (weapon == 1)
-				p.activeWeapon = p.shotgun;
-			else if (weapon == 2)
-				p.activeWeapon = p.rifle;
+		int localPlayerIndex = getPlayerMPIndex(player.username);
+		if (index >= 0 && index < this.getEntities().size() && index != localPlayerIndex) {
+			AbstractDynamicObject obj = this.getEntities().get(index);
+			if (obj instanceof PlayerMP) {
+				PlayerMP p = (PlayerMP) obj;
+				p.getBoundingBox().x = x;
+				p.getBoundingBox().y = y;
+				p.angle = angle;
+				p.state = state;
+				if (weapon == 0)
+					p.activeWeapon = p.pistol;
+				else if (weapon == 1)
+					p.activeWeapon = p.shotgun;
+				else if (weapon == 2)
+					p.activeWeapon = p.rifle;
+			}
 		}
 	}
 

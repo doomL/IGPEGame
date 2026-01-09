@@ -24,6 +24,7 @@ task debug(dependsOn: classes, type: JavaExec) {
 }
 
 task dist(type: Jar) {
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
     from files(sourceSets.main.output.classesDirs)
     from files(sourceSets.main.output.resourcesDir)
     from {configurations.runtimeClasspath.collect {zipTree(it)}}

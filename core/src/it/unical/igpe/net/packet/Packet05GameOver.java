@@ -10,6 +10,9 @@ public class Packet05GameOver extends Packet {
 	public Packet05GameOver(byte[] data) {
 		super(05);
 		String[] dataArray = readData(data).split(",");
+		if (dataArray.length < 2) {
+			throw new IllegalArgumentException("Invalid packet data: expected 2 fields, got " + dataArray.length);
+		}
 		this.usernameWinner = dataArray[0];
 		this.killsWinner = Integer.parseInt(dataArray[1]);
 	}

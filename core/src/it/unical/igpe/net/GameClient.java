@@ -126,9 +126,11 @@ public class GameClient extends Thread {
 	}
 
 	private void handleLogin(Packet00Login packet, InetAddress address, int port) {
-		for (AbstractDynamicObject e: IGPEGame.game.worldMP.getEntities()) {
-			if(((PlayerMP)e).username.equalsIgnoreCase(packet.getUsername())) {
-				return;
+		synchronized (IGPEGame.game.worldMP.getEntities()) {
+			for (AbstractDynamicObject e: IGPEGame.game.worldMP.getEntities()) {
+				if (e instanceof PlayerMP && ((PlayerMP)e).username.equalsIgnoreCase(packet.getUsername())) {
+					return;
+				}
 			}
 		}
 		System.out.println("[" + address.getHostAddress() + ":" + port + "]"
