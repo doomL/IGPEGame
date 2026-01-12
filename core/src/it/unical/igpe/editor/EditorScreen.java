@@ -392,20 +392,26 @@ public class EditorScreen implements Screen {
 	
 	private void saveMap() {
 		try {
+			it.unical.igpe.utils.DebugUtils.showMessage("SAVE MAP: Starting save operation...");
 			// Use file picker for save dialog
 			if (IGPEGame.filePicker != null) {
+				it.unical.igpe.utils.DebugUtils.showMessage("SAVE MAP: File picker available, using dialog");
 				// For desktop, we need to use a save dialog
 				// Since FilePicker only has pickFile (for open), we'll use a workaround
 				// Create a simple save dialog using the file picker interface
 				saveMapWithDialog();
 			} else {
 				// Fallback: save with timestamp
+				it.unical.igpe.utils.DebugUtils.showMessage("SAVE MAP: No file picker, using timestamp fallback");
 				String mode = mapEditor.isMultiplayer ? "MP" : "SP";
 				String filename = mode + "_custom_map_" + System.currentTimeMillis() + ".map";
+				it.unical.igpe.utils.DebugUtils.showMessage("SAVE MAP: Saving to: " + filename);
 				mapEditor.saveMap(filename);
+				it.unical.igpe.utils.DebugUtils.showMessage("SAVE MAP: Save completed successfully");
 				statusLabel.setText("Saved: " + filename);
 			}
 		} catch (Exception e) {
+			it.unical.igpe.utils.DebugUtils.showError("SAVE MAP: Error during save", e);
 			statusLabel.setText("Error: " + e.getMessage());
 			Gdx.app.error("EditorScreen", "Error saving map", e);
 		}

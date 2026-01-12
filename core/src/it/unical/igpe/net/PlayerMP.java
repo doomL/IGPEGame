@@ -26,13 +26,24 @@ public class PlayerMP extends Player {
 	public void fire() {
 		Packet03Fire packetFire;
 		if (!reloading) {
+			int weaponType;
 			if(this.activeWeapon.ID == "pistol")
-				packetFire = new Packet03Fire(username, (int) boundingBox.x, (int) boundingBox.y, angle, 1);
+				weaponType = 1;
 			else if(this.activeWeapon.ID == "shotgun")
-				packetFire = new Packet03Fire(username, (int) boundingBox.x, (int) boundingBox.y, angle, 2);
-			else 
-				packetFire = new Packet03Fire(username, (int) boundingBox.x, (int) boundingBox.y, angle, 3);
-			
+				weaponType = 2;
+			else
+				weaponType = 3;
+
+			packetFire = new Packet03Fire(username, (int) boundingBox.x, (int) boundingBox.y, angle, weaponType);
+
+			// For host player (port -1), add bullet locally immediately
+			// Otherwise rely on server echo to ensure synchronization
+			if (this.port == -1 && this.ipAddress == null && this.world != null) {
+				// This is the host player, add bullet locally
+				this.world.fireBullet(username, (int) boundingBox.x, (int) boundingBox.y, angle, weaponType);
+			}
+
+			// Send packet to server for broadcast to other players
 			packetFire.writeData(IGPEGame.game.socketClient);
 			this.activeWeapon.lastFired = 0f;
 			this.activeWeapon.actClip--;

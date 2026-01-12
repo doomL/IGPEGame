@@ -208,12 +208,12 @@ public class MultiScreen implements Screen {
 			public void changed(ChangeEvent event, Actor actor) {
 				try {
 					it.unical.igpe.utils.DebugUtils.showMessage("Starting server creation...");
-					
+
 					// Validate inputs
 					String portText = PortServerText.getText();
 					String killsText = serverKills.getText();
 					String usernameText = serverNameText.getText();
-					
+
 					if (portText == null || portText.trim().isEmpty()) {
 						it.unical.igpe.utils.DebugUtils.showError("Port cannot be empty");
 						return;
@@ -226,43 +226,81 @@ public class MultiScreen implements Screen {
 						it.unical.igpe.utils.DebugUtils.showError("Username cannot be empty");
 						return;
 					}
-					
+
 					int port = Integer.parseInt(portText);
 					int maxKills = Integer.parseInt(killsText);
-					
+
+					// Clean up existing server if any
+					if (IGPEGame.game.socketServer != null) {
+						it.unical.igpe.utils.DebugUtils.showMessage("Closing existing server...");
+						try {
+							IGPEGame.game.socketServer.close();
+							// Wait for socket to be released
+							Thread.sleep(200);
+						} catch (Exception e) {
+							it.unical.igpe.utils.DebugUtils.showError("Error closing existing server", e);
+						}
+						IGPEGame.game.socketServer = null;
+					}
+
 					it.unical.igpe.utils.DebugUtils.showMessage("Creating GameServer on port: " + port + " with map: " + selectedMap);
 					// Pass map content if available (Android), otherwise pass path (Desktop)
 					IGPEGame.game.socketServer = new GameServer(port, selectedMap, selectedMapContent);
-					
+
 					if (IGPEGame.game.socketServer == null) {
 						it.unical.igpe.utils.DebugUtils.showError("Failed to create GameServer");
 						return;
 					}
-					
+
 					IGPEGame.game.socketServer.MaxKills = maxKills;
 					it.unical.igpe.utils.DebugUtils.showMessage("Starting server thread...");
 					IGPEGame.game.socketServer.start();
-					
-					// Wait a bit for server to initialize
-					try {
-						Thread.sleep(100);
-					} catch (InterruptedException e) {
-						Thread.currentThread().interrupt();
+
+					// Wait for server to initialize (socket creation happens in background thread)
+					it.unical.igpe.utils.DebugUtils.showMessage("Waiting for server to initialize...");
+					int waitCount = 0;
+					while (!IGPEGame.game.socketServer.isValid() && waitCount < 50) {
+						try {
+							Thread.sleep(100);
+							waitCount++;
+						} catch (InterruptedException e) {
+							Thread.currentThread().interrupt();
+							break;
+						}
 					}
-					
+
+					if (!IGPEGame.game.socketServer.isValid()) {
+						it.unical.igpe.utils.DebugUtils.showError("Server failed to initialize - check if port is already in use");
+						IGPEGame.game.socketServer = null;
+						return;
+					}
+					it.unical.igpe.utils.DebugUtils.showMessage("Server initialized successfully");
+
 					it.unical.igpe.utils.DebugUtils.showMessage("Creating GameClient...");
 					// On Android, use localhost IP or device IP
 					String serverIP = "127.0.0.1";
 					IGPEGame.game.socketClient = new GameClient(serverIP, port);
-					
+
 					if (IGPEGame.game.socketClient == null) {
 						it.unical.igpe.utils.DebugUtils.showError("Failed to create GameClient");
+						// Clean up server since we can't connect
+						if (IGPEGame.game.socketServer != null) {
+							IGPEGame.game.socketServer.close();
+							IGPEGame.game.socketServer = null;
+						}
 						return;
 					}
-					
+
 					it.unical.igpe.utils.DebugUtils.showMessage("Starting client thread...");
 					IGPEGame.game.socketClient.start();
-					
+
+					// Wait a bit for client to initialize
+					try {
+						Thread.sleep(200);
+					} catch (InterruptedException e) {
+						Thread.currentThread().interrupt();
+					}
+
 					// Set the map name and content for the client (same as server since we're hosting)
 					MultiplayerWorld.serverMapName = selectedMap;
 					// If we have map content (custom map), set it so client can use it immediately
@@ -272,7 +310,7 @@ public class MultiScreen implements Screen {
 					} else {
 						MultiplayerWorld.serverMapContent = null; // Default map, client will load from assets
 					}
-					
+
 					MultiplayerWorld.username = usernameText;
 					it.unical.igpe.utils.DebugUtils.showMessage("Creating multiplayer game screen...");
 					// Create screen on OpenGL thread to avoid OpenGL context issues

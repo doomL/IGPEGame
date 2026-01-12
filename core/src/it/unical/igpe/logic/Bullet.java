@@ -7,6 +7,7 @@ import it.unical.igpe.utils.GameConfig;
 import it.unical.igpe.utils.Updatable;
 
 public class Bullet extends AbstractDynamicObject implements Updatable {
+	private float lifetime = 0; // Track how long the bullet has existed
 
 	public Bullet(Vector2 _pos, float _angle, String _ID, float dmg) {
 		this.angle = _angle;
@@ -18,8 +19,13 @@ public class Bullet extends AbstractDynamicObject implements Updatable {
 
 	@Override
 	public void update(float delta) {
+		lifetime += delta;
 		boundingBox.x += Math.cos(angle) * GameConfig.BULLETSPEED * delta;
 		boundingBox.y += Math.sin(angle) * GameConfig.BULLETSPEED * delta;
+	}
+	
+	public float getLifetime() {
+		return lifetime;
 	}
 
 	@Override

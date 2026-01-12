@@ -9,6 +9,7 @@ import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer.ShapeType;
 import com.badlogic.gdx.utils.viewport.ExtendViewport;
+import com.badlogic.gdx.utils.viewport.FitViewport;
 import com.badlogic.gdx.utils.viewport.Viewport;
 
 import it.unical.igpe.GUI.Assets;
@@ -35,6 +36,8 @@ public class WorldRenderer {
 		this.world = _world;
 		this.camera = new OrthographicCamera();
 		this.camera.setToOrtho(true, 800, 800);
+		// Use ExtendViewport to fill screen while maintaining aspect ratio (no stretching)
+		// ExtendViewport extends the world to fill screen, maintaining aspect ratio
 		this.viewport = new ExtendViewport(800, 800, camera);
 		this.batch = new SpriteBatch();
 		this.batch.setColor(1, 1, 1, 0.7f);

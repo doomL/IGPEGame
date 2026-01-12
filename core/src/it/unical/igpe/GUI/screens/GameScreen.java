@@ -250,6 +250,8 @@ public class GameScreen implements Screen {
 	public void resize(int width, int height) {
 		if (renderer != null) {
 			renderer.viewport.update(width, height, false);
+			// Update camera after viewport update
+			renderer.camera.update();
 		}
 	}
 

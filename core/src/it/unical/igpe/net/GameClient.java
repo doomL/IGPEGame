@@ -24,18 +24,27 @@ import it.unical.igpe.net.packet.Packet06MapData;
 public class GameClient extends Thread {
 	private InetAddress ipAddress;
 	private DatagramSocket socket;
+	private String serverAddress;
 	private int port;
+	private boolean initialized = false;
 
 	public GameClient(String ipAddress, int port) {
+		// Store parameters but don't create socket yet (avoid NetworkOnMainThreadException on Android)
+		this.serverAddress = ipAddress;
+		this.port = port;
+		it.unical.igpe.utils.DebugUtils.showMessage("GameClient constructor completed (socket will be created in background thread)");
+	}
+
+	private void initialize() {
 		try {
-			it.unical.igpe.utils.DebugUtils.showMessage("Connecting to server: " + ipAddress + ":" + port);
+			it.unical.igpe.utils.DebugUtils.showMessage("Creating client socket, connecting to server: " + serverAddress + ":" + port);
 			this.socket = new DatagramSocket();
-			this.ipAddress = InetAddress.getByName(ipAddress);
-			this.port = port;
-			System.out.println("Connected to server " + ipAddress);
-			it.unical.igpe.utils.DebugUtils.showMessage("GameClient created successfully");
+			this.ipAddress = InetAddress.getByName(serverAddress);
+			System.out.println("Connected to server " + serverAddress);
+			it.unical.igpe.utils.DebugUtils.showMessage("GameClient initialized successfully");
+			this.initialized = true;
 		} catch (UnknownHostException e) {
-			it.unical.igpe.utils.DebugUtils.showError("Unknown host: " + ipAddress, e);
+			it.unical.igpe.utils.DebugUtils.showError("Unknown host: " + serverAddress, e);
 			e.printStackTrace();
 		} catch (SocketException e1) {
 			it.unical.igpe.utils.DebugUtils.showError("Socket error creating GameClient", e1);
@@ -45,8 +54,19 @@ public class GameClient extends Thread {
 			e.printStackTrace();
 		}
 	}
-	
+
 	public void run() {
+		// Initialize socket in background thread (avoids NetworkOnMainThreadException on Android)
+		if (!initialized) {
+			initialize();
+		}
+
+		// Don't run if initialization failed
+		if (socket == null || !initialized) {
+			it.unical.igpe.utils.DebugUtils.showError("GameClient thread cannot start: initialization failed");
+			return;
+		}
+
 		it.unical.igpe.utils.DebugUtils.showMessage("GameClient thread started");
 		while(true) {
 			byte[] data = new byte[1024];
@@ -121,9 +141,9 @@ public class GameClient extends Thread {
 	private void handleMapData(Packet06MapData packet) {
 		String mapName = packet.getMapName();
 		String mapContent = packet.getMapContent();
-		
+
 		it.unical.igpe.utils.DebugUtils.showMessage("Received map data from server: " + mapName + (mapContent != null ? " (with content, length: " + mapContent.length() + ")" : ""));
-		
+
 		// Store map content directly (don't save to file)
 		if (mapContent != null && !mapContent.isEmpty()) {
 			// Store map content for use when creating MultiplayerWorld
@@ -135,26 +155,36 @@ public class GameClient extends Thread {
 			MultiplayerWorld.serverMapName = mapName;
 			MultiplayerWorld.serverMapContent = null;
 		}
-		
+
 		// If worldMP doesn't exist yet, it will be created with this map
-		// If it exists, we need to reload it with the new map
+		// If it exists, check if we're the host player before reloading
 		if (IGPEGame.game.worldMP == null) {
 			// World will be created with this map
 			it.unical.igpe.utils.DebugUtils.showMessage("World not created yet, will use map: " + mapName + (mapContent != null ? " (from content)" : ""));
 		} else {
-			// World already exists, need to reload with new map
-			it.unical.igpe.utils.DebugUtils.showMessage("Reloading world with map: " + mapName);
-			try {
-				// Save player state before reloading
-				String username = IGPEGame.game.worldMP.player != null ? IGPEGame.game.worldMP.player.getUsername() : MultiplayerWorld.username;
-				Vector2 playerPos = IGPEGame.game.worldMP.player != null ? 
-					new Vector2(IGPEGame.game.worldMP.player.getBoundingBox().x, IGPEGame.game.worldMP.player.getBoundingBox().y) : null;
-				
-				IGPEGame.game.worldMP = new MultiplayerWorld(MultiplayerWorld.serverMapName, MultiplayerWorld.serverMapContent, false);
-				it.unical.igpe.utils.DebugUtils.showMessage("World reloaded with map: " + mapName + (mapContent != null ? " (from content)" : ""));
-				it.unical.igpe.utils.DebugUtils.showMessage("World reloaded with map: " + mapName);
-			} catch (Exception e) {
-				it.unical.igpe.utils.DebugUtils.showError("Failed to reload world with map: " + mapName, e);
+			// Check if we're the host player (port -1, ipAddress null)
+			// Host player already has the correct map loaded, so don't reload
+			boolean isHost = IGPEGame.game.worldMP.player != null &&
+			                 IGPEGame.game.worldMP.player.ipAddress == null &&
+			                 IGPEGame.game.worldMP.player.port == -1;
+
+			if (isHost) {
+				it.unical.igpe.utils.DebugUtils.showMessage("Host player detected, skipping world reload (already has correct map)");
+			} else {
+				// Non-host client joining an existing game, need to reload with new map
+				it.unical.igpe.utils.DebugUtils.showMessage("Client joining server, reloading world with map: " + mapName);
+				try {
+					// Save player state before reloading
+					String username = IGPEGame.game.worldMP.player != null ? IGPEGame.game.worldMP.player.getUsername() : MultiplayerWorld.username;
+					Vector2 playerPos = IGPEGame.game.worldMP.player != null ?
+						new Vector2(IGPEGame.game.worldMP.player.getBoundingBox().x, IGPEGame.game.worldMP.player.getBoundingBox().y) : null;
+
+					IGPEGame.game.worldMP = new MultiplayerWorld(MultiplayerWorld.serverMapName, MultiplayerWorld.serverMapContent, false);
+					it.unical.igpe.utils.DebugUtils.showMessage("World reloaded with map: " + mapName + (mapContent != null ? " (from content)" : ""));
+					it.unical.igpe.utils.DebugUtils.showMessage("World reloaded with map: " + mapName);
+				} catch (Exception e) {
+					it.unical.igpe.utils.DebugUtils.showError("Failed to reload world with map: " + mapName, e);
+				}
 			}
 		}
 	}
@@ -164,14 +194,27 @@ public class GameClient extends Thread {
 	}
 
 	private void handleDeath(Packet04Death packet) {
+		if (IGPEGame.game.worldMP == null) {
+			it.unical.igpe.utils.DebugUtils.showError("Cannot handle death: worldMP is null!", null);
+			return;
+		}
 		IGPEGame.game.worldMP.handleDeath(packet.getUsernameKiller(), packet.getUsernameKilled());
 	}
 
 	private void handleFire(Packet03Fire packet) {
+		if (IGPEGame.game.worldMP == null) {
+			it.unical.igpe.utils.DebugUtils.showError("Cannot handle fire: worldMP is null!", null);
+			return;
+		}
 		IGPEGame.game.worldMP.fireBullet(packet.getUsername(), packet.getX(), packet.getY(), packet.getAngle(), packet.getWeapon());
 	}
 
 	private void handleLogin(Packet00Login packet, InetAddress address, int port) {
+		// Check if world exists before trying to access it
+		if (IGPEGame.game.worldMP == null) {
+			it.unical.igpe.utils.DebugUtils.showError("Cannot handle login: worldMP is null! Waiting for world to be created...", null);
+			return; // Skip this login packet, world will be created soon
+		}
 		synchronized (IGPEGame.game.worldMP.getEntities()) {
 			for (AbstractDynamicObject e: IGPEGame.game.worldMP.getEntities()) {
 				if (e instanceof PlayerMP && ((PlayerMP)e).username.equalsIgnoreCase(packet.getUsername())) {

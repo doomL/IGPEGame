@@ -26,7 +26,8 @@ import it.unical.igpe.utils.GameConfig;
 import it.unical.igpe.utils.TileType;
 
 public class MultiplayerGameScreen implements Screen {
-	MultiplayerWorld world;
+	// CRITICAL: Don't store world reference - it can be replaced when map is reloaded!
+	// Always get it fresh from IGPEGame.game.worldMP to avoid stale reference bug
 	HUD hud;
 	MultiplayerWorldRenderer renderer;
 	TouchController touchController;
@@ -35,11 +36,10 @@ public class MultiplayerGameScreen implements Screen {
 
 	public MultiplayerGameScreen() {
 		it.unical.igpe.utils.DebugUtils.showMessage("=== MultiplayerGameScreen constructor START ===");
-		
+
 		// Check if world already exists (created by server or previous attempt)
 		if (IGPEGame.game.worldMP != null) {
 			it.unical.igpe.utils.DebugUtils.showMessage("Using existing MultiplayerWorld (from server or previous creation)");
-			this.world = IGPEGame.game.worldMP;
 		} else {
 			// Use server map name if available, otherwise use default
 			String mapToLoad = MultiplayerWorld.serverMapName != null ? MultiplayerWorld.serverMapName : "arena.map";
@@ -47,17 +47,16 @@ public class MultiplayerGameScreen implements Screen {
 			it.unical.igpe.utils.DebugUtils.showMessage("Creating new MultiplayerWorld with map: " + mapToLoad + (mapContent != null ? " (from content, length: " + mapContent.length() + ")" : ""));
 			try {
 				IGPEGame.game.worldMP = new MultiplayerWorld(mapToLoad, mapContent, false);
-				this.world = IGPEGame.game.worldMP;
 				it.unical.igpe.utils.DebugUtils.showMessage("MultiplayerWorld created successfully");
 			} catch (Exception e) {
 				it.unical.igpe.utils.DebugUtils.showError("Failed to create MultiplayerWorld", e);
 				throw new RuntimeException("Failed to create MultiplayerWorld", e);
 			}
 		}
-		
-		it.unical.igpe.utils.DebugUtils.showMessage("World assigned: " + (this.world != null ? "OK" : "NULL"));
-		it.unical.igpe.utils.DebugUtils.showMessage("World.player: " + (this.world != null && this.world.getPlayer() != null ? this.world.getPlayer().getUsername() : "NULL"));
-		
+
+		it.unical.igpe.utils.DebugUtils.showMessage("World assigned: " + (IGPEGame.game.worldMP != null ? "OK" : "NULL"));
+		it.unical.igpe.utils.DebugUtils.showMessage("World.player: " + (IGPEGame.game.worldMP != null && IGPEGame.game.worldMP.getPlayer() != null ? IGPEGame.game.worldMP.getPlayer().getUsername() : "NULL"));
+
 		// Initialize OpenGL objects to null - will be created in first render()
 		this.hud = null;
 		this.renderer = null;
@@ -89,6 +88,9 @@ public class MultiplayerGameScreen implements Screen {
 
 	@Override
 	public void render(float delta) {
+		// Get fresh world reference (it can be replaced when map is reloaded!)
+		MultiplayerWorld world = IGPEGame.game.worldMP;
+
 		// First render call - log it immediately
 		if (!renderStarted) {
 			try {
@@ -104,18 +106,18 @@ public class MultiplayerGameScreen implements Screen {
 		
 		try {
 			// Ensure OpenGL objects are created (lazy initialization)
-			ensureOpenGLObjectsReady();
-			
+			ensureOpenGLObjectsReady(world);
+
 			if (world == null || world.getPlayer() == null) {
 				it.unical.igpe.utils.DebugUtils.showError("World or Player is null in multiplayer render!", null);
 				return;
 			}
-			
+
 			if (renderer == null) {
 				// Renderer not ready yet, skip this frame
 				return;
 			}
-			
+
 			// Ensure assets are fully loaded before rendering
 			if (it.unical.igpe.GUI.Assets.manager.getProgress() < 1.0f) {
 				it.unical.igpe.GUI.Assets.manager.update();
@@ -124,7 +126,7 @@ public class MultiplayerGameScreen implements Screen {
 				}
 				it.unical.igpe.GUI.Assets.manager.finishLoading();
 			}
-			
+
 			Gdx.gl.glClearColor(0.1f, 0.1f, 0.1f, 1);
 			Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT);
 
@@ -132,12 +134,12 @@ public class MultiplayerGameScreen implements Screen {
 			if (isAndroid && touchController != null) {
 				touchController.update();
 			}
-			handleInput(delta);
+			handleInput(delta, world);
 			renderer.render(delta);
 			if (hud != null) {
 				hud.render(world.player);
 			}
-			
+
 			// Render touch controls on top of everything (Android only)
 			if (isAndroid && touchController != null && renderer != null) {
 				touchController.render(renderer.getBatch());
@@ -152,7 +154,7 @@ public class MultiplayerGameScreen implements Screen {
 		}
 	}
 	
-	private void ensureOpenGLObjectsReady() {
+	private void ensureOpenGLObjectsReady(MultiplayerWorld world) {
 		// Verify assets are actually loaded
 		boolean assetsReady = false;
 		try {
@@ -173,13 +175,23 @@ public class MultiplayerGameScreen implements Screen {
 				return;
 			}
 		}
-		
+
 		if (!assetsReady) {
 			return;
 		}
-		
+
+		// Initialize viewport on first render if not already done
+		if (renderer != null && renderer.viewport != null && Gdx.graphics != null) {
+			int width = Gdx.graphics.getWidth();
+			int height = Gdx.graphics.getHeight();
+			if (width > 0 && height > 0) {
+				renderer.viewport.update(width, height, false);
+				renderer.getCamera().update();
+			}
+		}
+
 		// Create WorldRenderer and HUD on first render call when OpenGL is definitely ready
-		if (this.renderer == null) {
+		if (this.renderer == null && world != null) {
 			try {
 				// Verify player exists before creating renderer
 				if (world.getPlayer() == null) {
@@ -196,7 +208,7 @@ public class MultiplayerGameScreen implements Screen {
 				return;
 			}
 		}
-		
+
 		if (this.hud == null) {
 			try {
 				it.unical.igpe.utils.DebugUtils.showMessage("Creating HUD for multiplayer now (in render, OpenGL context is active)");
@@ -207,7 +219,7 @@ public class MultiplayerGameScreen implements Screen {
 				return;
 			}
 		}
-		
+
 		// Recreate touch controller now that renderer is ready
 		if (isAndroid && this.touchController == null && this.renderer != null) {
 			try {
@@ -222,8 +234,11 @@ public class MultiplayerGameScreen implements Screen {
 
 	@Override
 	public void resize(int width, int height) {
-		if (renderer != null) {
-			renderer.viewport.update(width, height, true);
+		if (renderer != null && renderer.viewport != null) {
+			// Match single-player: use centerCamera = false to prevent stretching
+			renderer.viewport.update(width, height, false);
+			// Update camera after viewport update
+			renderer.getCamera().update();
 		}
 	}
 
@@ -240,7 +255,7 @@ public class MultiplayerGameScreen implements Screen {
 		}
 	}
 
-	private void handleInput(float delta) {
+	private void handleInput(float delta, MultiplayerWorld world) {
 		// Handle aiming
 		if (isAndroid && touchController != null) {
 			// Use aiming joystick on right side

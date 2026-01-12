@@ -20,6 +20,7 @@ import it.unical.igpe.logic.Tile;
 import it.unical.igpe.net.packet.Packet00Login;
 import it.unical.igpe.net.packet.Packet04Death;
 import it.unical.igpe.net.screens.MultiplayerOverScreen;
+import it.unical.igpe.utils.DebugUtils;
 import it.unical.igpe.utils.GameConfig;
 import it.unical.igpe.utils.TileType;
 import it.unical.igpe.utils.Updatable;
@@ -143,6 +144,12 @@ public class MultiplayerWorld implements Updatable {
 					ListIterator<AbstractDynamicObject> iter = entities.listIterator();
 					Bullet b = it.next();
 					b.update(delta);
+
+					// Skip collision for first 0.1 seconds
+					if (b.getLifetime() < 0.1f) {
+						continue;
+					}
+
 					while (iter.hasNext()) {
 						PlayerMP a = (PlayerMP) iter.next();
 						if (!b.getID().equalsIgnoreCase(((PlayerMP) a).getUsername())
@@ -167,6 +174,12 @@ public class MultiplayerWorld implements Updatable {
 		if (this.player.getHP() <= 0) {
 			Packet04Death packet = new Packet04Death(Killer, this.player.getUsername());
 			packet.writeData(IGPEGame.game.socketClient);
+
+			// For host player (port -1), handle death locally immediately
+			// since they won't receive the death packet back from the server
+			if (this.player.port == -1 && this.player.ipAddress == null) {
+				this.handleDeath(Killer, this.player.getUsername());
+			}
 		}
 	}
 
@@ -236,8 +249,10 @@ public class MultiplayerWorld implements Updatable {
 			float x2 = (float) (16 * Math.cos(Math.toRadians(angle)) - 16 * Math.sin(Math.toRadians(angle)));
 			float y2 = (float) (16 * Math.sin(Math.toRadians(angle)) + 16 * Math.cos(Math.toRadians(angle)));
 			Vector2 shotPos = new Vector2(x + 32 + x2, y + 32 + y2);
+			Bullet newBullet = null;
 			if (weapon == 1) {
-				this.bls.add(new Bullet(shotPos, (float) Math.toRadians(angle + 90f), username, 15));
+				newBullet = new Bullet(shotPos, (float) Math.toRadians(angle + 90f), username, 15);
+				this.bls.add(newBullet);
 				MultiplayerWorldRenderer.pistolShot = true;
 				MultiplayerWorldRenderer.shotPos = shotPos;
 			} else if (weapon == 2) {
@@ -247,7 +262,8 @@ public class MultiplayerWorld implements Updatable {
 				MultiplayerWorldRenderer.shotgunShot = true;
 				MultiplayerWorldRenderer.shotPos = shotPos;
 			} else {
-				this.bls.add(new Bullet(shotPos, (float) Math.toRadians(angle + 90f), username, 50));
+				newBullet = new Bullet(shotPos, (float) Math.toRadians(angle + 90f), username, 50);
+				this.bls.add(newBullet);
 				MultiplayerWorldRenderer.rifleShot = true;
 				MultiplayerWorldRenderer.shotPos = shotPos;
 			}

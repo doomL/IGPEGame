@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.ListIterator;
 
 import com.badlogic.gdx.audio.Sound;
 import com.badlogic.gdx.graphics.Color;
@@ -14,10 +15,12 @@ import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer.ShapeType;
 import com.badlogic.gdx.math.Vector2;
 import com.badlogic.gdx.utils.viewport.ExtendViewport;
+import com.badlogic.gdx.utils.viewport.FitViewport;
 import com.badlogic.gdx.utils.viewport.Viewport;
 
 import it.unical.igpe.GUI.Assets;
 import it.unical.igpe.GUI.SoundManager;
+import it.unical.igpe.game.IGPEGame;
 import it.unical.igpe.logic.AbstractDynamicObject;
 import it.unical.igpe.logic.Bullet;
 import it.unical.igpe.logic.Player;
@@ -38,11 +41,14 @@ public class MultiplayerWorldRenderer {
 	public SpriteBatch getBatch() { return batch; }
 	private ShapeRenderer sr;
 	private float stateTime;
-	private MultiplayerWorld world;
+	// CRITICAL: Don't store world reference - it can be replaced when map is reloaded!
+	// Always get it fresh from IGPEGame.game.worldMP to avoid stale reference bug
 
 	public MultiplayerWorldRenderer(MultiplayerWorld world) {
-		this.world = world;
+		// Don't store world reference! It can be replaced when map is reloaded
 		this.camera = new OrthographicCamera();
+		// Use same camera settings as single-player to avoid stretching
+		// Note: setToOrtho with yDown=true means Y increases downward
 		this.camera.setToOrtho(true, 800, 800);
 		// Only set camera position if player exists (client side)
 		// Use getPlayer() which is safer
@@ -55,6 +61,9 @@ public class MultiplayerWorldRenderer {
 			this.camera.position.x = 400;
 			this.camera.position.y = 400;
 		}
+		this.camera.update();
+		// Use ExtendViewport to fill screen while maintaining aspect ratio (no stretching)
+		// ExtendViewport extends the world to fill screen, maintaining aspect ratio
 		this.viewport = new ExtendViewport(800, 800, camera);
 		this.batch = new SpriteBatch();
 		batch.setColor(1f, 1f, 1f, 0.7f);
@@ -64,10 +73,19 @@ public class MultiplayerWorldRenderer {
 
 	public void render(float deltaTime) {
 		stateTime += deltaTime;
+
+		// Get fresh world reference (it can be replaced when map is reloaded!)
+		MultiplayerWorld world = IGPEGame.game.worldMP;
+		if (world == null) {
+			return; // World not ready yet
+		}
+
+		// Match single-player EXACT order: set projection matrices first, then update camera
+		// (Single-player sets them before camera.update(), so we do the same)
 		batch.setProjectionMatrix(camera.combined);
 		sr.setProjectionMatrix(camera.combined);
 
-		// Only update camera if player exists
+		// Update camera position and update (match single-player)
 		if (world.getPlayer() != null) {
 			camera.position.x = world.getPlayer().getX();
 			camera.position.y = world.getPlayer().getY();
@@ -89,8 +107,12 @@ public class MultiplayerWorldRenderer {
 
 		// Drawing tiles
 		LinkedList<Tile> tiles = world.getTiles();
-		if (tiles == null) {
-			it.unical.igpe.utils.DebugUtils.showError("Tiles list is null in renderer!", null);
+		if (tiles == null || tiles.isEmpty()) {
+			if (tiles == null) {
+				it.unical.igpe.utils.DebugUtils.showError("Tiles list is null in renderer!", null);
+			} else {
+				it.unical.igpe.utils.DebugUtils.showError("Tiles list is EMPTY in renderer! Map not loaded yet.", null);
+			}
 			batch.end();
 			return;
 		}
@@ -210,19 +232,28 @@ public class MultiplayerWorldRenderer {
 				}
 			}
 		}
-		batch.end();
 		batch.setColor(1f, 1f, 1f, 0.7f);
+		batch.end();
 
-		// Drawing Bullets
-		com.badlogic.gdx.graphics.GL20 gl = com.badlogic.gdx.Gdx.gl;
-		gl.glEnable(com.badlogic.gdx.graphics.GL20.GL_BLEND);
-		gl.glBlendFunc(com.badlogic.gdx.graphics.GL20.GL_SRC_ALPHA, com.badlogic.gdx.graphics.GL20.GL_ONE_MINUS_SRC_ALPHA);
-		sr.begin(ShapeType.Filled);
-		for (Bullet bullet : world.getBls()) {
-			sr.circle(bullet.getX(), bullet.getY(), 4);
+		// Draw Bullets with proper synchronization
+		// CRITICAL FIX: Set projection matrix AFTER camera.update() and BEFORE sr.begin()
+		// This ensures ShapeRenderer uses the updated camera matrix
+		sr.setProjectionMatrix(camera.combined);
+
+		LinkedList<Bullet> bullets = world.getBls();
+		if (bullets != null && bullets.size() > 0) {
+			sr.begin(ShapeType.Filled);
+			try {
+				for (Bullet bullet : bullets) {
+					if (bullet != null) {
+						sr.circle(bullet.getX(), bullet.getY(), 4);
+					}
+				}
+			} catch (Exception e) {
+				// Concurrent modification, skip this frame
+			}
+			sr.end();
 		}
-		sr.end();
-		gl.glDisable(com.badlogic.gdx.graphics.GL20.GL_BLEND);
 		
 		if(pistolShot)
 			this.firePistol();

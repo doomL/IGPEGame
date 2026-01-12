@@ -168,23 +168,37 @@ public class MapEditor {
 	}
 	
 	public void saveMap(String path) throws IOException {
+		it.unical.igpe.utils.DebugUtils.showMessage("MapEditor.saveMap: Saving to path: " + path);
 		FileHandle fileHandle;
-		
-		// Try external storage first (works on Android and Desktop)
-		if (Gdx.files.isExternalStorageAvailable()) {
+
+		// Check if path is absolute (starts with / or C:\ etc.)
+		boolean isAbsolute = path.startsWith("/") || path.contains(":\\");
+
+		if (isAbsolute) {
+			// Path is absolute, use it directly
+			fileHandle = Gdx.files.absolute(path);
+			it.unical.igpe.utils.DebugUtils.showMessage("MapEditor.saveMap: Using absolute path: " + fileHandle.file().getAbsolutePath());
+		} else if (Gdx.files.isExternalStorageAvailable()) {
+			// Path is relative, use external storage (home directory)
 			fileHandle = Gdx.files.external(path);
+			it.unical.igpe.utils.DebugUtils.showMessage("MapEditor.saveMap: Using external storage: " + fileHandle.file().getAbsolutePath());
 		} else {
 			// Fallback to local storage
 			fileHandle = Gdx.files.local(path);
+			it.unical.igpe.utils.DebugUtils.showMessage("MapEditor.saveMap: Using local storage: " + fileHandle.file().getAbsolutePath());
 		}
-		
+
+		it.unical.igpe.utils.DebugUtils.showMessage("MapEditor.saveMap: Writing map data...");
 		writeMap(fileHandle.writer(false));
+		it.unical.igpe.utils.DebugUtils.showMessage("MapEditor.saveMap: Map saved successfully to: " + fileHandle.file().getAbsolutePath());
 	}
 	
 	private void writeMap(Writer writer) throws IOException {
+		// Write map[i][j] not map[j][i] to match the row-column order expected by WorldLoader
+		// i = row (y coordinate), j = column (x coordinate)
 		for (int i = 0; i < mapDimension; i++) {
 			for (int j = 0; j < mapDimension; j++) {
-				writer.write(String.valueOf(map[j][i]));
+				writer.write(String.valueOf(map[i][j]));
 				if (j < mapDimension - 1) {
 					writer.write(" ");
 				}

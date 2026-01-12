@@ -28,24 +28,27 @@ public class GameServer extends Thread {
 	public MultiplayerWorld worldMP;
 	public int MaxKills;
 	private DatagramSocket socket;
+	private int port;
 	private List<PlayerMP> connectedPlayers = new ArrayList<PlayerMP>();
 	private String mapName; // Map name sent to clients (filename)
 	private String serverMapPath; // Full path for server to load map (Desktop) or filename (Android)
 	private String serverMapContent; // Map content for server to load (Android)
+	private boolean initialized = false;
 
 	public GameServer(int port) {
 		this(port, "arena.map", null); // Default map
 	}
-	
+
 	public GameServer(int port, String mapName) {
 		this(port, mapName, null);
 	}
-	
+
 	public GameServer(int port, String mapName, String mapContent) {
+		this.port = port;
 		// Store map content if provided (Android), otherwise use path (Desktop)
 		this.serverMapContent = mapContent;
 		this.serverMapPath = mapName; // Use mapName as path for Desktop, or filename for Android
-		
+
 		// Extract just filename for client communication
 		String mapNameForClients = mapName;
 		if (mapName.contains("/")) {
@@ -56,9 +59,14 @@ public class GameServer extends Thread {
 		}
 		// Keep .map extension
 		this.mapName = mapNameForClients;
-		
+
+		// Socket creation and world loading moved to run() to avoid NetworkOnMainThreadException on Android
+		it.unical.igpe.utils.DebugUtils.showMessage("GameServer constructor completed (socket will be created in background thread)");
+	}
+
+	private void initialize() {
 		try {
-			it.unical.igpe.utils.DebugUtils.showMessage("Creating server on port: " + port + " with map: " + mapName);
+			it.unical.igpe.utils.DebugUtils.showMessage("Creating server socket on port: " + port + " with map: " + serverMapPath);
 			this.socket = new DatagramSocket(port);
 			System.out.println("Creating Server...");
 			it.unical.igpe.utils.DebugUtils.showMessage("Socket created, loading multiplayer world...");
@@ -71,13 +79,15 @@ public class GameServer extends Thread {
 					it.unical.igpe.utils.DebugUtils.showMessage("Loading multiplayer world from path: " + serverMapPath);
 					this.worldMP = new MultiplayerWorld(serverMapPath, true);
 				}
-				it.unical.igpe.utils.DebugUtils.showMessage("GameServer created successfully");
+				it.unical.igpe.utils.DebugUtils.showMessage("GameServer initialized successfully");
+				this.initialized = true;
 			} catch (Exception e) {
 				it.unical.igpe.utils.DebugUtils.showError("Failed to load multiplayer world", e);
 				// Close socket if world creation fails
 				if (this.socket != null && !this.socket.isClosed()) {
 					this.socket.close();
 				}
+				this.socket = null;
 				throw e; // Re-throw to indicate failure
 			}
 		} catch (SocketException e1) {
@@ -85,13 +95,24 @@ public class GameServer extends Thread {
 			e1.printStackTrace();
 			this.socket = null; // Mark as failed
 		} catch (Exception e) {
-			it.unical.igpe.utils.DebugUtils.showError("Unexpected error creating GameServer", e);
+			it.unical.igpe.utils.DebugUtils.showError("Unexpected error initializing GameServer", e);
 			e.printStackTrace();
 			this.socket = null; // Mark as failed
 		}
 	}
 
 	public void run() {
+		// Initialize socket and world in background thread (avoids NetworkOnMainThreadException on Android)
+		if (!initialized) {
+			initialize();
+		}
+
+		// Don't run if initialization failed
+		if (socket == null || !initialized) {
+			it.unical.igpe.utils.DebugUtils.showError("GameServer thread cannot start: initialization failed");
+			return;
+		}
+
 		it.unical.igpe.utils.DebugUtils.showMessage("GameServer thread started");
 		while (true) {
 			byte[] data = new byte[1024];
@@ -199,7 +220,16 @@ public class GameServer extends Thread {
 	}
 
 	public void close() {
-		this.socket.close();
+		if (this.socket != null && !this.socket.isClosed()) {
+			this.socket.close();
+		}
+	}
+
+	/**
+	 * Check if the server was created successfully
+	 */
+	public boolean isValid() {
+		return this.initialized && this.socket != null && !this.socket.isClosed();
 	}
 
 	private void handleFire(Packet03Fire packet) {
@@ -246,10 +276,16 @@ public class GameServer extends Thread {
 					p.port = player.port;
 				alreadyConnected = true;
 			}
-			sendData(packet.getData(), p.ipAddress, p.port);
+			// Only send to players with valid address and port
+			if (p.ipAddress != null && p.port > 0) {
+				sendData(packet.getData(), p.ipAddress, p.port);
+			}
 
-			Packet newPacket = new Packet00Login(p.getUsername(), (int) p.getBoundingBox().x, (int) p.getBoundingBox().y);
-			sendData(newPacket.getData(), player.ipAddress, player.port);
+			// Only send back if player has valid address and port
+			if (player.ipAddress != null && player.port > 0) {
+				Packet newPacket = new Packet00Login(p.getUsername(), (int) p.getBoundingBox().x, (int) p.getBoundingBox().y);
+				sendData(newPacket.getData(), player.ipAddress, player.port);
+			}
 		}
 		if (!alreadyConnected) {
 			this.connectedPlayers.add(player);
@@ -258,6 +294,11 @@ public class GameServer extends Thread {
 	}
 
 	public void sendData(byte[] data, InetAddress ipAddress, int port) {
+		// Validate port and address before sending
+		if (ipAddress == null || port <= 0 || port > 65535) {
+			it.unical.igpe.utils.DebugUtils.showMessage("Skipping sendData to invalid address/port: " + ipAddress + ":" + port);
+			return;
+		}
 		DatagramPacket packet = new DatagramPacket(data, data.length, ipAddress, port);
 		try {
 			socket.send(packet);
@@ -268,7 +309,10 @@ public class GameServer extends Thread {
 
 	public void sendDataToAllClients(byte[] data) {
 		for (PlayerMP p : connectedPlayers) {
-			sendData(data, p.ipAddress, p.port);
+			// Only send to players with valid address and port
+			if (p.ipAddress != null && p.port > 0) {
+				sendData(data, p.ipAddress, p.port);
+			}
 		}
 	}
 
